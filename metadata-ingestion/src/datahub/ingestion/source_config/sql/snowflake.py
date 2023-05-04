@@ -59,7 +59,7 @@ class SnowflakeProvisionRoleConfig(ConfigModel):
     @pydantic.validator("admin_username", always=True)
     def username_not_empty(cls, v, values, **kwargs):
         v_str: str = str(v)
-        if v_str.strip() == "":
+        if not v_str.strip():
             raise ValueError("username is empty")
         return v
 
@@ -96,15 +96,15 @@ class BaseSnowflakeConfig(BaseTimeWindowConfig):
                 f"unsupported authenticator type '{v}' was provided,"
                 f" use one of {list(VALID_AUTH_TYPES.keys())}"
             )
-        else:
-            if v == "KEY_PAIR_AUTHENTICATOR":
-                # If we are using key pair auth, we need the private key path and password to be set
-                if values.get("private_key_path") is None:
-                    raise ValueError(
-                        f"'private_key_path' was none "
-                        f"but should be set when using {v} authentication"
-                    )
-            logger.info(f"using authenticator type '{v}'")
+        if (
+            v == "KEY_PAIR_AUTHENTICATOR"
+            and values.get("private_key_path") is None
+        ):
+            raise ValueError(
+                f"'private_key_path' was none "
+                f"but should be set when using {v} authentication"
+            )
+        logger.info(f"using authenticator type '{v}'")
         return v
 
     @pydantic.validator("include_view_lineage")

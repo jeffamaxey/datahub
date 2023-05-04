@@ -18,7 +18,7 @@ def create_owners_list_from_urn_list(
     ownership_source_type: Union[None, OwnershipSourceClass] = None
     if source_type:
         ownership_source_type = OwnershipSourceClass(type=source_type)
-    owners_list = [
+    return [
         OwnerClass(
             owner=owner_urn,
             type=OwnershipTypeClass.DATAOWNER,
@@ -26,7 +26,6 @@ def create_owners_list_from_urn_list(
         )
         for owner_urn in owner_urns
     ]
-    return owners_list
 
 
 def create_mocked_dbt_source() -> DBTSource:

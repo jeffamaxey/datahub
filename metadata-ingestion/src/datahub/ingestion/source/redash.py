@@ -195,29 +195,28 @@ class BigqueryQualifiedNameParser(QualifiedNameParser):
 
 
 def get_full_qualified_name(platform: str, database_name: str, table_name: str) -> str:
-    if platform == "postgres":
-        full_qualified_name = PostgresQualifiedNameParser().get_full_qualified_name(
-            database_name, table_name
-        )
-    elif platform == "mysql":
-        full_qualified_name = MysqlQualifiedNameParser().get_full_qualified_name(
-            database_name, table_name
-        )
-    elif platform == "mssql":
-        full_qualified_name = MssqlQualifiedNameParser().get_full_qualified_name(
-            database_name, table_name
-        )
-    elif platform == "athena":
-        full_qualified_name = AthenaQualifiedNameParser().get_full_qualified_name(
+    if platform == "athena":
+        return AthenaQualifiedNameParser().get_full_qualified_name(
             database_name, table_name
         )
     elif platform == "bigquery":
-        full_qualified_name = BigqueryQualifiedNameParser().get_full_qualified_name(
+        return BigqueryQualifiedNameParser().get_full_qualified_name(
+            database_name, table_name
+        )
+    elif platform == "mssql":
+        return MssqlQualifiedNameParser().get_full_qualified_name(
+            database_name, table_name
+        )
+    elif platform == "mysql":
+        return MysqlQualifiedNameParser().get_full_qualified_name(
+            database_name, table_name
+        )
+    elif platform == "postgres":
+        return PostgresQualifiedNameParser().get_full_qualified_name(
             database_name, table_name
         )
     else:
-        full_qualified_name = f"{database_name}.{table_name}"
-    return full_qualified_name
+        return f"{database_name}.{table_name}"
 
 
 class RedashConfig(ConfigModel):
@@ -297,7 +296,6 @@ class RedashSource(Source):
         test_response = self.client._get(f"{self.config.connect_uri}/api")
         if test_response.status_code == 200:
             logger.info("Redash API connected succesfully")
-            pass
         else:
             raise ValueError(f"Failed to connect to {self.config.connect_uri}/api")
 
@@ -338,13 +336,11 @@ class RedashSource(Source):
         return resp
 
     def _get_platform_based_on_datasource(self, data_source: Dict) -> str:
-        data_source_type = data_source.get("type")
-        if data_source_type:
+        if data_source_type := data_source.get("type"):
             map = REDASH_DATA_SOURCE_TO_DATAHUB_MAP.get(
                 data_source_type, {"platform": DEFAULT_DATA_SOURCE_PLATFORM}
             )
-            platform = map.get("platform", DEFAULT_DATA_SOURCE_PLATFORM)
-            return platform
+            return map.get("platform", DEFAULT_DATA_SOURCE_PLATFORM)
         return DEFAULT_DATA_SOURCE_PLATFORM
 
     def _get_database_name_based_on_datasource(
@@ -355,18 +351,13 @@ class RedashSource(Source):
         data_source_options = data_source.get("options", {})
 
         if data_source_type == "results":
-            database_name = data_source_name
-        else:
-            map = REDASH_DATA_SOURCE_TO_DATAHUB_MAP.get(
-                data_source_type, {"platform": DEFAULT_DATA_SOURCE_PLATFORM}
-            )
+            return data_source_name
+        map = REDASH_DATA_SOURCE_TO_DATAHUB_MAP.get(
+            data_source_type, {"platform": DEFAULT_DATA_SOURCE_PLATFORM}
+        )
 
-            database_name_key = map.get("db_name_key", "db")
-            database_name = data_source_options.get(
-                database_name_key, DEFAULT_DATA_BASE_NAME
-            )
-
-        return database_name
+        database_name_key = map.get("db_name_key", "db")
+        return data_source_options.get(database_name_key, DEFAULT_DATA_BASE_NAME)
 
     def _construct_datalineage_urn(
         self, platform: str, database_name: str, sql_table_name: str
@@ -386,30 +377,27 @@ class RedashSource(Source):
         if database_name:
             query = sql_query_data.get("query", "")
 
-            # Getting table lineage from SQL parsing
-            if self.parse_table_names_from_sql and data_source_syntax == "sql":
-                try:
-                    dataset_urns = list()
-                    sql_table_names = self._get_sql_table_names(
-                        query, self.sql_parser_path
-                    )
-                    for sql_table_name in sql_table_names:
-                        dataset_urns.append(
-                            self._construct_datalineage_urn(
-                                platform, database_name, sql_table_name
-                            )
-                        )
-                except Exception as e:
-                    logger.error(e)
-                    logger.error(query)
-
-                # make sure dataset_urns is not empty list
-                return dataset_urns if len(dataset_urns) > 0 else None
-
-            else:
+            if not self.parse_table_names_from_sql or data_source_syntax != "sql":
                 return [
                     builder.make_dataset_urn(platform, database_name, self.config.env)
                 ]
+
+            try:
+                sql_table_names = self._get_sql_table_names(
+                    query, self.sql_parser_path
+                )
+                dataset_urns = [
+                    self._construct_datalineage_urn(
+                        platform, database_name, sql_table_name
+                    )
+                    for sql_table_name in sql_table_names
+                ]
+            except Exception as e:
+                logger.error(e)
+                logger.error(query)
+
+                # make sure dataset_urns is not empty list
+            return dataset_urns if dataset_urns else None
 
         return None
 
@@ -427,8 +415,7 @@ class RedashSource(Source):
 
                 # TRICKY: If top-left most widget is a Textbox, then we assume it is the Description
                 if options and text and isHidden is None:
-                    position = options.get("position")
-                    if position:
+                    if position := options.get("position"):
                         col = position.get("col")
                         row = position.get("row")
                         if col == 0 and row == 0:
@@ -443,9 +430,7 @@ class RedashSource(Source):
     ) -> List[str]:
         chart_urns = []
         for widget in dashboard_widgets:
-            # In Redash, chart is called visualization
-            visualization = widget.get("visualization")
-            if visualization:
+            if visualization := widget.get("visualization"):
                 visualization_id = visualization.get("id", None)
                 if visualization_id is not None:
                     chart_urns.append(

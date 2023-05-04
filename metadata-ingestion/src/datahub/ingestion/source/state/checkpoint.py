@@ -144,7 +144,7 @@ class Checkpoint:
                     max_allowed_state_size=max_allowed_state_size
                 ),
             )
-            checkpoint_aspect = DatahubIngestionCheckpointClass(
+            return DatahubIngestionCheckpointClass(
                 timestampMillis=int(datetime.utcnow().timestamp() * 1000),
                 pipelineName=self.pipeline_name,
                 platformInstanceId=self.platform_instance_id,
@@ -152,7 +152,6 @@ class Checkpoint:
                 config=self.config.json(),
                 state=checkpoint_state,
             )
-            return checkpoint_aspect
         except Exception as e:
             logger.error(
                 "Failed to construct the checkpoint aspect from checkpoint object", e

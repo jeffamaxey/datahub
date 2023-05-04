@@ -61,9 +61,7 @@ class MetadataChangeProposalWrapper:
             return False
         if self.aspect and not self.aspect.validate():
             return False
-        if not self.make_mcp().validate():
-            return False
-        return True
+        return bool(self.make_mcp().validate())
 
     def to_obj(self, tuples: bool = False) -> dict:
         return self.make_mcp().to_obj(tuples=tuples)

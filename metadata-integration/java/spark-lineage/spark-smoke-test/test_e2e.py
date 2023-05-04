@@ -67,7 +67,7 @@ def test_ingestion_via_rest(json_file):
     f = open(os.path.join(GOLDEN_FILES_PATH, json_file))
     golden_data = json.load(f)
     for urn, value in golden_data.items():
-        url = GMS_ENDPOINT + "/entities/" + urn
+        url = f"{GMS_ENDPOINT}/entities/{urn}"
         print(url)
         response = requests.get(url)
         response.raise_for_status()

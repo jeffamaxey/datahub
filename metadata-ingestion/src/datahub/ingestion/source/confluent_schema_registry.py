@@ -64,13 +64,15 @@ class ConfluentSchemaRegistry(KafkaSchemaRegistryBase):
         if subject_key in self.source_config.topic_subject_map:
             return self.source_config.topic_subject_map[subject_key]
 
-        # Subject name format when the schema registry subject name strategy is
-        #  (a) TopicNameStrategy(default strategy): <topic name>-<key/value>
-        #  (b) TopicRecordNameStrategy: <topic name>-<fully-qualified record name>-<key/value>
-        for subject in self.known_schema_registry_subjects:
-            if subject.startswith(topic) and subject.endswith(subject_key_suffix):
-                return subject
-        return None
+        return next(
+            (
+                subject
+                for subject in self.known_schema_registry_subjects
+                if subject.startswith(topic)
+                and subject.endswith(subject_key_suffix)
+            ),
+            None,
+        )
 
     @staticmethod
     def _compact_schema(schema_str: str) -> str:

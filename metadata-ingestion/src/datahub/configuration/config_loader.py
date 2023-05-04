@@ -61,9 +61,7 @@ def load_config_file(config_file: Union[pathlib.Path, str]) -> dict:
         config_mech = TomlConfigurationMechanism()
     else:
         raise ConfigurationError(
-            "Only .toml and .yml are supported. Cannot process file type {}".format(
-                config_file.suffix
-            )
+            f"Only .toml and .yml are supported. Cannot process file type {config_file.suffix}"
         )
 
     with config_file.open() as raw_config_fp:

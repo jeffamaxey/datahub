@@ -37,6 +37,9 @@ def run_and_get_pipeline(pipeline_config_dict: Dict[str, Any]) -> Pipeline:
 
 @pytest.fixture
 def mock_datahub_graph():
+
+
+
     class MockDataHubGraphContext:
         pipeline_name: str = "test_pipeline"
         run_id: str = "test_run"
@@ -71,22 +74,19 @@ def mock_datahub_graph():
             self.mcps_emitted[mcpw.entityUrn] = mcpw
 
         def monkey_patch_get_latest_timeseries_value(
-            self,
-            graph_ref: MagicMock,
-            entity_urn: str,
-            aspect_name: str,
-            aspect_type: Type[DictWrapper],
-            filter_criteria_map: Dict[str, str],
-        ) -> Optional[DictWrapper]:
+                    self,
+                    graph_ref: MagicMock,
+                    entity_urn: str,
+                    aspect_name: str,
+                    aspect_type: Type[DictWrapper],
+                    filter_criteria_map: Dict[str, str],
+                ) -> Optional[DictWrapper]:
             """
             Monkey patched implementation of DatahubGraph.get_latest_timeseries_value that returns the latest cached aspect
             for a given entity urn.
             """
-            # Retrieve the cached mcpw and return its aspect value.
-            mcpw = self.mcps_emitted.get(entity_urn)
-            if mcpw:
-                return mcpw.aspect
-            return None
+            return mcpw.aspect if (mcpw := self.mcps_emitted.get(entity_urn)) else None
+
 
     mock_datahub_graph_ctx = MockDataHubGraphContext()
     return mock_datahub_graph_ctx.mock_graph

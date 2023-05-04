@@ -34,19 +34,18 @@ def _convert_to_cardinality(
         return Cardinality.NONE
 
     if pct_unique == 1.0:
-        cardinality = Cardinality.UNIQUE
+        return Cardinality.UNIQUE
     elif unique_count == 1:
-        cardinality = Cardinality.ONE
+        return Cardinality.ONE
     elif unique_count == 2:
-        cardinality = Cardinality.TWO
+        return Cardinality.TWO
     elif 0 < unique_count < 20:
-        cardinality = Cardinality.VERY_FEW
+        return Cardinality.VERY_FEW
     elif 0 < unique_count < 60:
-        cardinality = Cardinality.FEW
-    elif unique_count is None or unique_count == 0 or pct_unique is None:
-        cardinality = Cardinality.NONE
+        return Cardinality.FEW
+    elif unique_count == 0 or pct_unique is None:
+        return Cardinality.NONE
     elif pct_unique > 0.1:
-        cardinality = Cardinality.VERY_MANY
+        return Cardinality.VERY_MANY
     else:
-        cardinality = Cardinality.MANY
-    return cardinality
+        return Cardinality.MANY

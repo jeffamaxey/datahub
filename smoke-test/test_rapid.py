@@ -38,7 +38,7 @@ def frontend_session(wait_for_healthchecks):
 def test_ingestion_via_rest_rapid(frontend_session, wait_for_healthchecks):
     ingest_file_via_rest(bootstrap_small)
     ingest_file_via_rest(bootstrap_small_2)
-    urn = f"urn:li:dataset:(urn:li:dataPlatform:testPlatform,testDataset,PROD)"
+    urn = "urn:li:dataset:(urn:li:dataPlatform:testPlatform,testDataset,PROD)"
     json = {
             "query": """query getDataset($urn: String!) {\n
                 dataset(urn: $urn) {\n

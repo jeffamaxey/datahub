@@ -114,8 +114,8 @@ class BaseTransformer(Transformer, metaclass=ABCMeta):
                     return True
             # fall through, no entity type matched
             return False
-        elif isinstance(record, MetadataChangeProposalWrapper) or isinstance(
-            record, MetadataChangeProposalClass
+        elif isinstance(
+            record, (MetadataChangeProposalWrapper, MetadataChangeProposalClass)
         ):
             return record.entityType in entity_types
 
@@ -148,16 +148,13 @@ class BaseTransformer(Transformer, metaclass=ABCMeta):
         if mce.proposedSnapshot:
             self._record_mce(mce)
         if isinstance(self, SingleAspectTransformer):
-            aspect_type = self.snapshot_aspect_registry.get_aspect_type(  # type: ignore
+            if aspect_type := self.snapshot_aspect_registry.get_aspect_type(  # type: ignore
                 self.aspect_name()
-            )
-            if aspect_type:
-                # if we find a type corresponding to the aspect name we look for it in the mce
-                old_aspect = datahub.emitter.mce_builder.get_aspect_if_available(
+            ):
+                if old_aspect := datahub.emitter.mce_builder.get_aspect_if_available(
                     mce,
                     aspect_type,
-                )
-                if old_aspect:
+                ):
                     if isinstance(self, LegacyMCETransformer):
                         # use the transform_one pathway to transform this MCE
                         envelope.record = self.transform_one(mce)

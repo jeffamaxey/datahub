@@ -65,17 +65,18 @@ class AthenaSource(SQLAlchemySource):
             table_name=table, schema_name=schema
         )
         description = metadata.comment
-        custom_properties: Dict[str, str] = {}
-        custom_properties["partition_keys"] = json.dumps(
-            [
-                {
-                    "name": partition.name,
-                    "type": partition.type,
-                    "comment": partition.comment if partition.comment else "",
-                }
-                for partition in metadata.partition_keys
-            ]
-        )
+        custom_properties: Dict[str, str] = {
+            "partition_keys": json.dumps(
+                [
+                    {
+                        "name": partition.name,
+                        "type": partition.type,
+                        "comment": partition.comment if partition.comment else "",
+                    }
+                    for partition in metadata.partition_keys
+                ]
+            )
+        }
         for key, value in metadata.parameters.items():
             custom_properties[key] = value if value else ""
 

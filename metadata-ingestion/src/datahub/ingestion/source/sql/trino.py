@@ -60,11 +60,7 @@ def get_table_comment(self, connection, table_name: str, schema: str = None, **k
         query = f"SELECT * FROM {properties_table}"
         row = connection.execute(sql.text(query)).fetchone()
 
-        # Generate properties dictionary.
-        properties = {}
-        for col_name, col_value in row.items():
-            properties[col_name] = col_value
-
+        properties = dict(row.items())
         return {"text": properties.get("comment", None), "properties": properties}
     except TrinoQueryError as e:
         if e.error_name in (
@@ -235,9 +231,9 @@ def _parse_struct_fields(parts):
         fields.append({"name": field_name, "type": field_type})
     return {
         "type": "record",
-        "name": "__struct_{}".format(str(uuid.uuid4()).replace("-", "")),
+        "name": f'__struct_{str(uuid.uuid4()).replace("-", "")}',
         "fields": fields,
-        "native_data_type": "ROW({})".format(parts),
+        "native_data_type": f"ROW({parts})",
     }
 
 

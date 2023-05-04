@@ -57,10 +57,7 @@ class LookerViewFileLoader:
 
 	def load_viewfile(self, path: str, connection: str):
 		viewfile = self._load_viewfile(path)
-		if viewfile is None:
-			return None
-
-		return replace(viewfile, connection=connection)
+		return None if viewfile is None else replace(viewfile, connection=connection)
 
 
 
@@ -139,47 +136,48 @@ class LookerView:
 
 			return LookerView(absolute_file_path=looker_viewfile.absolute_file_path, connection=connection, view_name=view_name, sql_table_names=sql_table_names)
 
-		# There is a single dependency in the view, on the sql_table_name
 		if sql_table_name is not None:
 			return LookerView(absolute_file_path=looker_viewfile.absolute_file_path, connection=connection, view_name=view_name, sql_table_names=[sql_table_name])
 
-		# The sql_table_name might be defined in another view and this view is extending that view, try to find it
-		else:
-			extends = looker_view.get("extends", [])
-			if len(extends) == 0:
-				# The view is malformed, the view is not a derived table, does not contain a sql_table_name or an extends
-				print(f"Skipping malformed with view_name: {view_name}. View should have a sql_table_name if it is not a derived table")
-				return None
+		extends = looker_view.get("extends", [])
+		if len(extends) == 0:
+			# The view is malformed, the view is not a derived table, does not contain a sql_table_name or an extends
+			print(f"Skipping malformed with view_name: {view_name}. View should have a sql_table_name if it is not a derived table")
+			return None
 
-			extends_to_looker_view = []
+		extends_to_looker_view = []
 
-			# The base view could live in the same file
-			for raw_view in looker_viewfile.views:
-				raw_view_name = raw_view["name"]
-				# Make sure to skip loading view we are currently trying to resolve
-				if raw_view_name != view_name:
-					maybe_looker_view = LookerView.from_looker_dict(raw_view, connection, looker_viewfile, looker_viewfile_loader)
-					if maybe_looker_view is not None and maybe_looker_view.view_name in extends:
-						extends_to_looker_view.append(maybe_looker_view)
+		# The base view could live in the same file
+		for raw_view in looker_viewfile.views:
+			raw_view_name = raw_view["name"]
+			# Make sure to skip loading view we are currently trying to resolve
+			if raw_view_name != view_name:
+				maybe_looker_view = LookerView.from_looker_dict(raw_view, connection, looker_viewfile, looker_viewfile_loader)
+				if maybe_looker_view is not None and maybe_looker_view.view_name in extends:
+					extends_to_looker_view.append(maybe_looker_view)
 
 			# Or it could live in one of the included files, we do not know which file the base view lives in, try them all!
-			for include in looker_viewfile.resolved_includes:
-				looker_viewfile = looker_viewfile_loader.load_viewfile(include, connection)
-				if looker_viewfile is not None:
-					for view in looker_viewfile.views:
-						maybe_looker_view = LookerView.from_looker_dict(view, connection, looker_viewfile, looker_viewfile_loader)
-						if maybe_looker_view is None:
-							continue
+		for include in looker_viewfile.resolved_includes:
+			looker_viewfile = looker_viewfile_loader.load_viewfile(include, connection)
+			if looker_viewfile is not None:
+				for view in looker_viewfile.views:
+					maybe_looker_view = LookerView.from_looker_dict(view, connection, looker_viewfile, looker_viewfile_loader)
+					if maybe_looker_view is None:
+						continue
 
-						if maybe_looker_view is not None and maybe_looker_view.view_name in extends:
-							extends_to_looker_view.append(maybe_looker_view)
+					if maybe_looker_view.view_name in extends:
+						extends_to_looker_view.append(maybe_looker_view)
 
-			if len(extends_to_looker_view) != 1:
-				print(f"Skipping malformed view with view_name: {view_name}. View should have a single view in a view inheritance chain with a sql_table_name")
-				return None
+		if len(extends_to_looker_view) != 1:
+			print(f"Skipping malformed view with view_name: {view_name}. View should have a single view in a view inheritance chain with a sql_table_name")
+			return None
 
-			output_looker_view = LookerView(absolute_file_path=looker_viewfile.absolute_file_path, connection=connection, view_name=view_name, sql_table_names=extends_to_looker_view[0].sql_table_names)
-			return output_looker_view
+		return LookerView(
+			absolute_file_path=looker_viewfile.absolute_file_path,
+			connection=connection,
+			view_name=view_name,
+			sql_table_names=extends_to_looker_view[0].sql_table_names,
+		)
 
 
 
@@ -191,12 +189,7 @@ def get_platform_and_table(view_name: str, connection: str, sql_table_name: str)
 	Presto supports querying across multiple catalogs, so we infer which underlying database presto is using based on the presto catalog name
 	For SpotHero, we have 3 catalogs in presto: "redshift", "hive", and "hive_emr"
 	"""
-	if connection == "redshift_test":
-		platform = "redshift"
-		table_name = sql_table_name
-		return platform, table_name
-
-	elif connection == "presto":
+	if connection == "presto":
 		parts = sql_table_name.split(".")
 		catalog = parts[0]
 
@@ -214,8 +207,10 @@ def get_platform_and_table(view_name: str, connection: str, sql_table_name: str)
 			platform = "hive_emr"
 			return platform, sql_table_name
 
-		table_name = ".".join(parts[1::])
-		return platform, table_name
+		return platform, ".".join(parts[1::])
+	elif connection == "redshift_test":
+		return "redshift", sql_table_name
+
 	else:
 		raise Exception(f"Could not find a platform for looker view with connection: {connection}")
 
@@ -230,62 +225,59 @@ def construct_data_urn(looker_view: LookerView):
 
 
 def build_dataset_mce(looker_view: LookerView):
-    """
+	"""
     Creates MetadataChangeEvent for the dataset, creating upstream lineage links
     """
-    actor, sys_time = "urn:li:corpuser:etl", int(time.time()) * 1000
+	actor, sys_time = "urn:li:corpuser:etl", int(time.time()) * 1000
 
-    upstreams = [{
-    	"auditStamp":{
-    		"time": sys_time,
-    		"actor":actor
-    	},
-    	"dataset": construct_datalineage_urn(looker_view.view_name, looker_view.connection, sql_table_name),
-    	"type":"TRANSFORMED"
-    } for sql_table_name in looker_view.sql_table_names]
+	upstreams = [{
+		"auditStamp":{
+			"time": sys_time,
+			"actor":actor
+		},
+		"dataset": construct_datalineage_urn(looker_view.view_name, looker_view.connection, sql_table_name),
+		"type":"TRANSFORMED"
+	} for sql_table_name in looker_view.sql_table_names]
 
 
-    doc_elements = [{
-    	"url":f"https://github.com/spothero/internal-looker-repo/blob/master/{looker_view.get_relative_file_path()}",
-    	"description":"Github looker view definition",
-    	"createStamp":{
-    		"time": sys_time,
-    		"actor": actor
-    	}
-    }]
+	doc_elements = [{
+		"url":f"https://github.com/spothero/internal-looker-repo/blob/master/{looker_view.get_relative_file_path()}",
+		"description":"Github looker view definition",
+		"createStamp":{
+			"time": sys_time,
+			"actor": actor
+		}
+	}]
 
-    owners = [{
-    	"owner": f"urn:li:corpuser:analysts",
-    	"type": "DEVELOPER"
-    }]
+	owners = [{"owner": "urn:li:corpuser:analysts", "type": "DEVELOPER"}]
 
-    return {
-        "auditHeader": None,
-        "proposedSnapshot":("com.linkedin.pegasus2avro.metadata.snapshot.DatasetSnapshot", {
-            "urn": construct_data_urn(looker_view),
-            "aspects": [
-            	("com.linkedin.pegasus2avro.dataset.UpstreamLineage", {"upstreams": upstreams}),
-            	("com.linkedin.pegasus2avro.common.InstitutionalMemory", {"elements": doc_elements}),
-            	("com.linkedin.pegasus2avro.common.Ownership", {
-            		"owners": owners,
-            		"lastModified":{
-            			"time": sys_time,
-            			"actor": actor
-            		}
-            	})
-            ]
-        }),
-        "proposedDelta": None
-    }
+	return {
+	    "auditHeader": None,
+	    "proposedSnapshot":("com.linkedin.pegasus2avro.metadata.snapshot.DatasetSnapshot", {
+	        "urn": construct_data_urn(looker_view),
+	        "aspects": [
+	        	("com.linkedin.pegasus2avro.dataset.UpstreamLineage", {"upstreams": upstreams}),
+	        	("com.linkedin.pegasus2avro.common.InstitutionalMemory", {"elements": doc_elements}),
+	        	("com.linkedin.pegasus2avro.common.Ownership", {
+	        		"owners": owners,
+	        		"lastModified":{
+	        			"time": sys_time,
+	        			"actor": actor
+	        		}
+	        	})
+	        ]
+	    }),
+	    "proposedDelta": None
+	}
 
 
 def delivery_report(err, msg):
-    """ Called once for each message produced to indicate delivery result.
+	""" Called once for each message produced to indicate delivery result.
         Triggered by poll() or flush(). """
-    if err is not None:
-        print('Message delivery failed: {}'.format(err))
-    else:
-        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+	if err is not None:
+		print(f'Message delivery failed: {err}')
+	else:
+		print(f'Message delivered to {msg.topic()} [{msg.partition()}]')
 
 
 def make_kafka_producer(extra_kafka_conf):
@@ -296,8 +288,9 @@ def make_kafka_producer(extra_kafka_conf):
 
 	key_schema = avro.loads('{"type": "string"}')
 	record_schema = avro.load(AVSC_PATH)
-	producer = AvroProducer(conf, default_key_schema=key_schema, default_value_schema=record_schema)
-	return producer
+	return AvroProducer(
+		conf, default_key_schema=key_schema, default_value_schema=record_schema
+	)
 
 
 def main():
@@ -307,7 +300,9 @@ def main():
 	looker_models = []
 	all_views = []
 
-	model_files = sorted(f for f in glob.glob(f"{LOOKER_DIRECTORY}/**/*.model.lkml", recursive=True))
+	model_files = sorted(
+		iter(glob.glob(f"{LOOKER_DIRECTORY}/**/*.model.lkml", recursive=True))
+	)
 	for f in model_files:
 		try:
 			with open(f, 'r') as file:
@@ -325,8 +320,9 @@ def main():
 			looker_viewfile = viewfile_loader.load_viewfile(include, model.connection)
 			if looker_viewfile is not None:
 				for raw_view in looker_viewfile.views:
-					maybe_looker_view = LookerView.from_looker_dict(raw_view, model.connection, looker_viewfile, viewfile_loader)
-					if maybe_looker_view:
+					if maybe_looker_view := LookerView.from_looker_dict(
+						raw_view, model.connection, looker_viewfile, viewfile_loader
+					):
 						all_views.append(maybe_looker_view)
 
 

@@ -83,7 +83,7 @@ def make_glossary_term_urn(path: List[str]) -> str:
 def get_owners(owners: Owners) -> models.OwnershipClass:
     owners_meta: List[models.OwnerClass] = []
     if owners.users is not None:
-        owners_meta = owners_meta + [
+        owners_meta += [
             models.OwnerClass(
                 owner=make_user_urn(o),
                 type=models.OwnershipTypeClass.DEVELOPER,
@@ -91,7 +91,7 @@ def get_owners(owners: Owners) -> models.OwnershipClass:
             for o in owners.users
         ]
     if owners.groups is not None:
-        owners_meta = owners_meta + [
+        owners_meta += [
             models.OwnerClass(
                 owner=make_group_urn(o),
                 type=models.OwnershipTypeClass.DEVELOPER,
@@ -256,8 +256,7 @@ class BusinessGlossaryFileSource(Source):
 
     def load_glossary_config(self, file_name: str) -> BusinessGlossaryConfig:
         config = load_config_file(file_name)
-        glossary_cfg = BusinessGlossaryConfig.parse_obj(config)
-        return glossary_cfg
+        return BusinessGlossaryConfig.parse_obj(config)
 
     def get_workunits(self) -> Iterable[Union[MetadataWorkUnit, UsageStatsWorkUnit]]:
         glossary_config = self.load_glossary_config(self.config.file)

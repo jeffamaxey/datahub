@@ -47,9 +47,7 @@ class SQLServerConfig(BasicSQLAlchemyConfig):
         regular = f"{schema}.{table}"
         if self.database_alias:
             return f"{self.database_alias}.{regular}"
-        if self.database:
-            return f"{self.database}.{regular}"
-        return regular
+        return f"{self.database}.{regular}" if self.database else regular
 
 
 class SQLServerSource(SQLAlchemySource):
@@ -139,9 +137,8 @@ class SQLServerSource(SQLAlchemySource):
         # Update column description if available.
         db_name: str = self.get_db_name(inspector)
         for column in columns:
-            description: Optional[str] = self.column_descriptions.get(
+            if description := self.column_descriptions.get(
                 f"{db_name}.{schema}.{table}.{column['name']}",
-            )
-            if description:
+            ):
                 column["comment"] = description
         return columns

@@ -53,11 +53,7 @@ class MockResponse:
 
     def raise_for_status(self):
         if self.error_list is not None and self.url in self.error_list:
-            http_error_msg = "%s Client Error: %s for url: %s" % (
-                400,
-                "Simulate error",
-                self.url,
-            )
+            http_error_msg = f"400 Client Error: Simulate error for url: {self.url}"
             raise HTTPError(http_error_msg, response=self)
 
 

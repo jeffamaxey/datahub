@@ -41,7 +41,7 @@ class HiveColumnToAvroConverter:
         s = s.strip()
         if s.startswith("array<"):
             if s[-1] != ">":
-                raise ValueError("'>' should be the last char, but got: %s" % s)
+                raise ValueError(f"'>' should be the last char, but got: {s}")
             return {
                 "type": "array",
                 "items": HiveColumnToAvroConverter._parse_datatype_string(s[6:-1]),
@@ -49,12 +49,11 @@ class HiveColumnToAvroConverter:
             }
         elif s.startswith("map<"):
             if s[-1] != ">":
-                raise ValueError("'>' should be the last char, but got: %s" % s)
+                raise ValueError(f"'>' should be the last char, but got: {s}")
             parts = HiveColumnToAvroConverter._ignore_brackets_split(s[4:-1], ",")
             if len(parts) != 2:
                 raise ValueError(
-                    "The map type string format is: 'map<key_type,value_type>', "
-                    + "but got: %s" % s
+                    f"The map type string format is: 'map<key_type,value_type>', but got: {s}"
                 )
             kt = HiveColumnToAvroConverter._parse_datatype_string(parts[0])
             vt = HiveColumnToAvroConverter._parse_datatype_string(parts[1])
@@ -68,7 +67,7 @@ class HiveColumnToAvroConverter:
             }
         elif s.startswith("uniontype<"):
             if s[-1] != ">":
-                raise ValueError("'>' should be the last char, but got: %s" % s)
+                raise ValueError(f"'>' should be the last char, but got: {s}")
             parts = HiveColumnToAvroConverter._ignore_brackets_split(s[10:-1], ",")
             t = []
             ustruct_seqn = 0
@@ -86,7 +85,7 @@ class HiveColumnToAvroConverter:
             return t
         elif s.startswith("struct<"):
             if s[-1] != ">":
-                raise ValueError("'>' should be the last char, but got: %s" % s)
+                raise ValueError(f"'>' should be the last char, but got: {s}")
             return HiveColumnToAvroConverter._parse_struct_fields_string(
                 s[7:-1], **kwargs
             )
@@ -103,13 +102,12 @@ class HiveColumnToAvroConverter:
             name_and_type = HiveColumnToAvroConverter._ignore_brackets_split(part, ":")
             if len(name_and_type) != 2:
                 raise ValueError(
-                    "The struct field string format is: 'field_name:field_type', "
-                    + "but got: %s" % part
+                    f"The struct field string format is: 'field_name:field_type', but got: {part}"
                 )
             field_name = name_and_type[0].strip()
             if field_name.startswith("`"):
                 if field_name[-1] != "`":
-                    raise ValueError("'`' should be the last char, but got: %s" % s)
+                    raise ValueError(f"'`' should be the last char, but got: {s}")
                 field_name = field_name[1:-1]
             field_type = HiveColumnToAvroConverter._parse_datatype_string(
                 name_and_type[1]
@@ -117,16 +115,14 @@ class HiveColumnToAvroConverter:
             fields.append({"name": field_name, "type": field_type})
 
         if kwargs.get("ustruct_seqn") is not None:
-            struct_name = "__structn_{}_{}".format(
-                kwargs["ustruct_seqn"], str(uuid.uuid4()).replace("-", "")
-            )
+            struct_name = f'__structn_{kwargs["ustruct_seqn"]}_{str(uuid.uuid4()).replace("-", "")}'
         else:
-            struct_name = "__struct_{}".format(str(uuid.uuid4()).replace("-", ""))
+            struct_name = f'__struct_{str(uuid.uuid4()).replace("-", "")}'
         return {
             "type": "record",
             "name": struct_name,
             "fields": fields,
-            "native_data_type": "struct<{}>".format(s),
+            "native_data_type": f"struct<{s}>",
         }
 
     @staticmethod
@@ -193,7 +189,7 @@ class HiveColumnToAvroConverter:
                 buf += c
             elif c in HiveColumnToAvroConverter._BRACKETS.values():
                 if level == 0:
-                    raise ValueError("Brackets are not correctly paired: %s" % s)
+                    raise ValueError(f"Brackets are not correctly paired: {s}")
                 level -= 1
                 buf += c
             elif c == separator and level > 0:
@@ -205,7 +201,7 @@ class HiveColumnToAvroConverter:
                 buf += c
 
         if len(buf) == 0:
-            raise ValueError("The %s cannot be the last char: %s" % (separator, s))
+            raise ValueError(f"The {separator} cannot be the last char: {s}")
         parts.append(buf)
         return parts
 

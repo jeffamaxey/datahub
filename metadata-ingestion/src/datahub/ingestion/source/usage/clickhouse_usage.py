@@ -104,8 +104,7 @@ class ClickHouseUsageSource(Source):
     def _make_sql_engine(self) -> Engine:
         url = self.config.get_sql_alchemy_url()
         logger.debug(f"sql_alchemy_url = {url}")
-        engine = create_engine(url, **self.config.options)
-        return engine
+        return create_engine(url, **self.config.options)
 
     def _get_clickhouse_history(self):
         query = self._make_usage_query()
@@ -114,11 +113,7 @@ class ClickHouseUsageSource(Source):
         events = []
         for row in results:
             # minor type conversion
-            if hasattr(row, "_asdict"):
-                event_dict = row._asdict()
-            else:
-                event_dict = dict(row)
-
+            event_dict = row._asdict() if hasattr(row, "_asdict") else dict(row)
             # stripping extra spaces caused by above _asdict() conversion
             for k, v in event_dict.items():
                 if isinstance(v, str):
@@ -188,10 +183,7 @@ class ClickHouseUsageSource(Source):
         for event in events:
             floored_ts = get_time_bucket(event.starttime, self.config.bucket_duration)
 
-            resource = (
-                f'{self.config.platform_instance+"." if self.config.platform_instance else ""}'
-                f"{event.schema_}.{event.table}"
-            )
+            resource = f'{f"{self.config.platform_instance}." if self.config.platform_instance else ""}{event.schema_}.{event.table}'
 
             agg_bucket = datasets[floored_ts].setdefault(
                 resource,

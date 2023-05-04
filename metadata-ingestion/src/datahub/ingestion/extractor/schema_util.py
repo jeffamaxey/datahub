@@ -138,8 +138,7 @@ class AvroToMceSchemaConverter:
         TypeClass: Any = self.field_type_mapping.get(tp)
         if logical_type is not None:
             TypeClass = self.field_logical_type_mapping.get(logical_type, TypeClass)
-        dt = SchemaFieldDataType(type=TypeClass())
-        return dt
+        return SchemaFieldDataType(type=TypeClass())
 
     def _is_nullable(self, schema: avro.schema.Schema) -> bool:
         if isinstance(schema, avro.schema.Field):
@@ -182,7 +181,7 @@ class AvroToMceSchemaConverter:
         if simple_native_type.startswith("__struct_"):
             simple_native_type = "struct"
         elif simple_native_type.startswith("__structn_"):
-            simple_native_type = "struct{}".format(simple_native_type.split("_")[3])
+            simple_native_type = f'struct{simple_native_type.split("_")[3]}'
         if isinstance(schema, avro.schema.Field):
             return simple_native_type
         else:
@@ -269,25 +268,23 @@ class AvroToMceSchemaConverter:
 
                 field_path = self._converter._get_cur_field_path()
                 merged_props = {}
-                merged_props.update(self._schema.other_props)
+                merged_props |= self._schema.other_props
                 merged_props.update(schema.other_props)
 
                 tags = None
                 if "deprecated" in merged_props:
-                    description = (
-                        f"<span style=\"color:red\">DEPRECATED: {merged_props['deprecated']}</span>\n"
-                        + description
-                    )
+                    description = f"""<span style=\"color:red\">DEPRECATED: {merged_props['deprecated']}</span>\n{description}"""
                     tags = GlobalTagsClass(
                         tags=[TagAssociationClass(tag="urn:li:tag:Deprecated")]
                     )
 
-                field = SchemaField(
+                yield SchemaField(
                     fieldPath=field_path,
                     # Populate it with the simple native type for now.
                     nativeDataType=native_data_type,
                     type=self._converter._get_column_type(
-                        actual_schema.type, self._actual_schema.props.get("logicalType")
+                        actual_schema.type,
+                        self._actual_schema.props.get("logicalType"),
                     ),
                     description=description,
                     recursive=False,
@@ -296,7 +293,6 @@ class AvroToMceSchemaConverter:
                     globalTags=tags,
                     jsonProps=json.dumps(merged_props) if merged_props else None,
                 )
-                yield field
 
         def __exit__(self, exc_type, exc_val, exc_tb):
             self._converter._prefix_name_stack.pop()
@@ -307,11 +303,10 @@ class AvroToMceSchemaConverter:
         """Responsible for generation for appropriate sub-schemas for every nested AVRO type."""
 
         def gen_items_from_list_tuple_or_scalar(
-            val: Any,
-        ) -> Generator[avro.schema.Schema, None, None]:
+                val: Any,
+            ) -> Generator[avro.schema.Schema, None, None]:
             if isinstance(val, (list, tuple)):
-                for i in val:
-                    yield i
+                yield from val
             else:
                 yield val
 
@@ -392,8 +387,8 @@ class AvroToMceSchemaConverter:
         actual_schema = self._get_underlying_type_if_option_as_union(schema, schema)
 
         with AvroToMceSchemaConverter.SchemaFieldEmissionContextManager(
-            schema, actual_schema, self
-        ) as fe_schema:
+                schema, actual_schema, self
+            ) as fe_schema:
             if isinstance(
                 actual_schema,
                 (
@@ -412,11 +407,9 @@ class AvroToMceSchemaConverter:
             ):
                 # We have encountered a nested record, emit the most-recently seen field.
                 yield from self._gen_from_last_field(actual_schema if recurse else None)
-            else:
-                # We are not yet in the context of any field. Generate all nested sub-schemas under the complex type.
-                if recurse:
-                    for sub_schema in self._get_sub_schemas(actual_schema):
-                        yield from self._to_mce_fields(sub_schema)
+            elif recurse:
+                for sub_schema in self._get_sub_schemas(actual_schema):
+                    yield from self._to_mce_fields(sub_schema)
 
     def _gen_non_nested_to_mce_fields(
         self, schema: AvroNonNestedSchemas
@@ -432,9 +425,9 @@ class AvroToMceSchemaConverter:
     ) -> Generator[SchemaField, None, None]:
         # Invoke the relevant conversion handler for the schema element type.
         schema_type = (
-            type(avro_schema)
-            if not isinstance(avro_schema, avro.schema.LogicalSchema)
-            else avro.schema.LogicalSchema
+            avro.schema.LogicalSchema
+            if isinstance(avro_schema, avro.schema.LogicalSchema)
+            else type(avro_schema)
         )
         yield from self._avro_type_to_mce_converter_map[schema_type](avro_schema)
 

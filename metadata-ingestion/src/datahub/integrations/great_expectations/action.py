@@ -178,12 +178,11 @@ class DataHubValidationAction(ValidationAction):
             result = "DataHub notification succeeded"
         except Exception as e:
             result = "DataHub notification failed"
-            if self.graceful_exceptions:
-                logger.error(e)
-                logger.info("Supressing error because graceful_exceptions is set")
-            else:
+            if not self.graceful_exceptions:
                 raise
 
+            logger.error(e)
+            logger.info("Supressing error because graceful_exceptions is set")
         return {"datahub_notification_result": result}
 
     def get_assertions_with_results(
@@ -212,7 +211,7 @@ class DataHubValidationAction(ValidationAction):
         for result in validation_result_suite.results:
             expectation_config = result["expectation_config"]
             expectation_type = expectation_config["expectation_type"]
-            success = True if result["success"] else False
+            success = bool(result["success"])
             kwargs = {
                 k: v for k, v in expectation_config["kwargs"].items() if k != "batch_id"
             }
@@ -254,8 +253,6 @@ class DataHubValidationAction(ValidationAction):
 
             # TODO: Understand why their run time is incorrect.
             run_time = run_id.run_time.astimezone(timezone.utc)
-            assertionResults = []
-
             evaluation_parameters = (
                 {
                     k: convert_to_string(v)
@@ -310,8 +307,7 @@ class DataHubValidationAction(ValidationAction):
             )
             if ds.get("partitionSpec") is not None:
                 assertionResult.partitionSpec = ds.get("partitionSpec")
-            assertionResults.append(assertionResult)
-
+            assertionResults = [assertionResult]
             assertions_with_results.append(
                 {
                     "assertionUrn": assertionUrn,
@@ -512,14 +508,13 @@ class DataHubValidationAction(ValidationAction):
             scope=DatasetAssertionScope.DATASET_ROWS,
         )
 
-        if expectation_type in known_expectations.keys():
+        if expectation_type in known_expectations:
             assertion = known_expectations[expectation_type]
             datasetAssertionInfo.scope = assertion.scope
             datasetAssertionInfo.aggregation = assertion.aggregation
             datasetAssertionInfo.operator = assertion.operator
             datasetAssertionInfo.parameters = assertion.parameters
 
-        # Heuristically mapping other expectations
         else:
             if "column" in kwargs and expectation_type.startswith(
                 "expect_column_value"
@@ -611,7 +606,7 @@ class DataHubValidationAction(ValidationAction):
                 ].batch_request.runtime_parameters["query"]
                 partitionSpec = PartitionSpecClass(
                     type=PartitionTypeClass.QUERY,
-                    partition="Query_" + builder.datahub_guid(query),
+                    partition=f"Query_{builder.datahub_guid(query)}",
                 )
                 batchSpec = BatchSpec(
                     nativeBatchId=batch_identifier,
@@ -655,9 +650,9 @@ class DataHubValidationAction(ValidationAction):
         return dataset_partitions
 
     def get_platform_instance(self, datasource_name):
-        if self.platform_instance_map and datasource_name in self.platform_instance_map:
-            return self.platform_instance_map[datasource_name]
         if self.platform_instance_map:
+            if datasource_name in self.platform_instance_map:
+                return self.platform_instance_map[datasource_name]
             warn(
                 f"Datasource {datasource_name} is not present in platform_instance_map"
             )
@@ -681,7 +676,7 @@ def make_dataset_urn_from_sqlalchemy_uri(
                 f"DataHubValidationAction failed to locate database name for {data_platform}."
             )
             return None
-        schema_name = "{}.{}".format(url_instance.database, schema_name)
+        schema_name = f"{url_instance.database}.{schema_name}"
     elif data_platform == "mssql":
         schema_name = schema_name if schema_name else "dbo"
         if url_instance.database is None:
@@ -689,7 +684,7 @@ def make_dataset_urn_from_sqlalchemy_uri(
                 f"DataHubValidationAction failed to locate database name for {data_platform}."
             )
             return None
-        schema_name = "{}.{}".format(url_instance.database, schema_name)
+        schema_name = f"{url_instance.database}.{schema_name}"
     elif data_platform in ["trino", "snowflake"]:
         if schema_name is None or url_instance.database is None:
             warn(
@@ -700,12 +695,7 @@ def make_dataset_urn_from_sqlalchemy_uri(
         # If data platform is snowflake, we artificially lowercase the Database name.
         # This is because DataHub also does this during ingestion.
         # Ref: https://github.com/datahub-project/datahub/blob/master/metadata-ingestion%2Fsrc%2Fdatahub%2Fingestion%2Fsource%2Fsql%2Fsnowflake.py#L272
-        schema_name = "{}.{}".format(
-            url_instance.database.lower()
-            if data_platform == "snowflake"
-            else url_instance.database,
-            schema_name,
-        )
+        schema_name = f'{url_instance.database.lower() if data_platform == "snowflake" else url_instance.database}.{schema_name}'
     elif data_platform == "bigquery":
         if url_instance.host is None or url_instance.database is None:
             warn(
@@ -713,7 +703,7 @@ def make_dataset_urn_from_sqlalchemy_uri(
                     {data_platform}. "
             )
             return None
-        schema_name = "{}.{}".format(url_instance.host, url_instance.database)
+        schema_name = f"{url_instance.host}.{url_instance.database}"
 
     schema_name = schema_name if schema_name else url_instance.database
     if schema_name is None:
@@ -722,16 +712,14 @@ def make_dataset_urn_from_sqlalchemy_uri(
         )
         return None
 
-    dataset_name = "{}.{}".format(schema_name, table_name)
+    dataset_name = f"{schema_name}.{table_name}"
 
-    dataset_urn = builder.make_dataset_urn_with_platform_instance(
+    return builder.make_dataset_urn_with_platform_instance(
         platform=data_platform,
         name=dataset_name,
         platform_instance=platform_instance,
         env=env,
     )
-
-    return dataset_urn
 
 
 @dataclass

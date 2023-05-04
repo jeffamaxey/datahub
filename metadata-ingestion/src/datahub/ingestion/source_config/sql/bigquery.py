@@ -68,7 +68,6 @@ class BigQueryConfig(BaseTimeWindowConfig, SQLAlchemyConfig):
             raise ConfigurationError(
                 "bigquery_audit_metadata_datasets must be specified if using exported audit metadata. Otherwise set use_v2_audit_metadata to True."
             )
-            pass
         return values
 
     @pydantic.validator("platform")

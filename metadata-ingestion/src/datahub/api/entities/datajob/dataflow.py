@@ -81,7 +81,7 @@ class DataFlow:
         return [tags]
 
     def generate_mce(self) -> MetadataChangeEventClass:
-        flow_mce = MetadataChangeEventClass(
+        return MetadataChangeEventClass(
             proposedSnapshot=DataFlowSnapshotClass(
                 urn=str(self.urn),
                 aspects=[
@@ -97,10 +97,8 @@ class DataFlow:
             )
         )
 
-        return flow_mce
-
     def generate_mcp(self) -> Iterable[MetadataChangeProposalWrapper]:
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="dataflow",
             entityUrn=str(self.urn),
             aspectName="dataFlowInfo",
@@ -112,27 +110,22 @@ class DataFlow:
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
-
         for owner in self.generate_ownership_aspect():
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="dataflow",
                 entityUrn=str(self.urn),
                 aspectName="ownership",
                 aspect=owner,
                 changeType=ChangeTypeClass.UPSERT,
             )
-            yield mcp
-
         for tag in self.generate_tags_aspect():
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="dataflow",
                 entityUrn=str(self.urn),
                 aspectName="globalTags",
                 aspect=tag,
                 changeType=ChangeTypeClass.UPSERT,
             )
-            yield mcp
 
     def emit(
         self,

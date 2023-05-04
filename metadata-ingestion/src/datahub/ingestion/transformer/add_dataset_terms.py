@@ -44,8 +44,7 @@ class AddDatasetTerms(DatasetTermsTransformer):
     def transform_one(self, mce: MetadataChangeEventClass) -> MetadataChangeEventClass:
         if not isinstance(mce.proposedSnapshot, DatasetSnapshotClass):
             return mce
-        terms_to_add = self.config.get_terms_to_add(mce.proposedSnapshot)
-        if terms_to_add:
+        if terms_to_add := self.config.get_terms_to_add(mce.proposedSnapshot):
             terms = builder.get_or_add_aspect(
                 mce,
                 GlossaryTermsClass(

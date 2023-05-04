@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 def assert_field_paths_are_unique(fields: List[SchemaField]) -> None:
-    fields_paths = [f.fieldPath for f in fields if re.match(".*[^]]$", f.fieldPath)]
-
-    if fields_paths:
+    if fields_paths := [
+        f.fieldPath for f in fields if re.match(".*[^]]$", f.fieldPath)
+    ]:
         assert len(fields_paths) == len(set(fields_paths))
 
 

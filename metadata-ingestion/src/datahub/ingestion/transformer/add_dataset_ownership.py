@@ -45,9 +45,7 @@ class AddDatasetOwnershipConfig(ConfigModel):
 
     @validator("semantics", pre=True)
     def ensure_semantics_is_upper_case(cls, v):
-        if isinstance(v, str):
-            return v.upper()
-        return v
+        return v.upper() if isinstance(v, str) else v
 
 
 class AddDatasetOwnership(DatasetOwnershipTransformer):
@@ -78,39 +76,36 @@ class AddDatasetOwnership(DatasetOwnershipTransformer):
             # nothing to add, no need to consult server
             return None
         assert mce_ownership
-        server_ownership = graph.get_ownership(entity_urn=urn)
-        if server_ownership:
-            # compute patch
-            # we only include owners who are not present in the server ownership
-            # if owner ids match, but the ownership type differs, we prefer the transformers opinion
-            owners_to_add: List[OwnerClass] = []
-            needs_update = False
-            server_owner_ids = [o.owner for o in server_ownership.owners]
-            for owner in mce_ownership.owners:
-                if owner.owner not in server_owner_ids:
-                    owners_to_add.append(owner)
-                else:
-                    # we need to check if the type matches, and if it doesn't, update it
-                    for server_owner in server_ownership.owners:
-                        if (
-                            owner.owner == server_owner.owner
-                            and owner.type != server_owner.type
-                        ):
-                            server_owner.type = owner.type
-                            needs_update = True
-
-            if owners_to_add or needs_update:
-                mce_ownership.owners = server_ownership.owners + owners_to_add
-                return mce_ownership
-            else:
-                return None
-        else:
+        if not (server_ownership := graph.get_ownership(entity_urn=urn)):
             return mce_ownership
+        # compute patch
+        # we only include owners who are not present in the server ownership
+        # if owner ids match, but the ownership type differs, we prefer the transformers opinion
+        owners_to_add: List[OwnerClass] = []
+        needs_update = False
+        server_owner_ids = [o.owner for o in server_ownership.owners]
+        for owner in mce_ownership.owners:
+            if owner.owner not in server_owner_ids:
+                owners_to_add.append(owner)
+            else:
+                # we need to check if the type matches, and if it doesn't, update it
+                for server_owner in server_ownership.owners:
+                    if (
+                        owner.owner == server_owner.owner
+                        and owner.type != server_owner.type
+                    ):
+                        server_owner.type = owner.type
+                        needs_update = True
+
+        if owners_to_add or needs_update:
+            mce_ownership.owners = server_ownership.owners + owners_to_add
+            return mce_ownership
+        else:
+            return None
 
     def transform_one(self, mce: MetadataChangeEventClass) -> MetadataChangeEventClass:
         assert isinstance(mce.proposedSnapshot, DatasetSnapshotClass)
-        owners_to_add = self.config.get_owners_to_add(mce.proposedSnapshot)
-        if owners_to_add:
+        if owners_to_add := self.config.get_owners_to_add(mce.proposedSnapshot):
             ownership = builder.get_or_add_aspect(
                 mce,
                 OwnershipClass(
@@ -141,9 +136,7 @@ class SimpleDatasetOwnershipConfig(DatasetOwnershipBaseConfig):
 
     @validator("semantics", pre=True)
     def upper_case_semantics(cls, v):
-        if isinstance(v, str):
-            return v.upper()
-        return v
+        return v.upper() if isinstance(v, str) else v
 
 
 class SimpleAddDatasetOwnership(AddDatasetOwnership):
@@ -188,14 +181,13 @@ class PatternAddDatasetOwnership(AddDatasetOwnership):
         owner_pattern: KeyValuePattern,
         ownership_type: Optional[str] = None,
     ) -> List[OwnerClass]:
-        owners = [
+        return [
             OwnerClass(
                 owner=owner,
                 type=builder.validate_ownership_type(ownership_type),
             )
             for owner in owner_pattern.value(key)
         ]
-        return owners
 
     def __init__(self, config: PatternDatasetOwnershipConfig, ctx: PipelineContext):
         ownership_type = builder.validate_ownership_type(config.ownership_type)

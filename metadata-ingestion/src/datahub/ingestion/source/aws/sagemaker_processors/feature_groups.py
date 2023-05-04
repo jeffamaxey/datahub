@@ -62,17 +62,11 @@ class FeatureGroupProcessor:
             FeatureGroupName=feature_group_name
         )
 
-        # use falsy fallback since AWS stubs require this to be a string in tests
-        next_token = feature_group.get("NextToken", "")
-
-        # paginate over feature group features
-        while next_token:
+        while next_token := feature_group.get("NextToken", ""):
             next_features = self.sagemaker_client.describe_feature_group(
                 FeatureGroupName=feature_group_name, NextToken=next_token
             )
             feature_group["FeatureDefinitions"] += next_features["FeatureDefinitions"]
-            next_token = feature_group.get("NextToken", "")
-
         return feature_group
 
     def get_feature_group_wu(

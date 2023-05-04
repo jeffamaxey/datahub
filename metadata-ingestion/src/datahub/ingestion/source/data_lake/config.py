@@ -46,9 +46,7 @@ class DataLakeSourceConfig(ConfigModel):
         if value != "":
             return value
 
-        if is_s3_uri(values["base_path"]):
-            return "s3"
-        return "file"
+        return "s3" if is_s3_uri(values["base_path"]) else "file"
 
     @pydantic.validator("path_spec", always=True)
     def validate_path_spec(

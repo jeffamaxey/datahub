@@ -35,7 +35,7 @@ class IngestionJobStateProvider(
     """
 
     def __init__(self, name: str, commit_policy: CommitPolicy):
-        super(IngestionJobStateProvider, self).__init__(name, commit_policy, dict())
+        super(IngestionJobStateProvider, self).__init__(name, commit_policy, {})
 
     @classmethod
     @abstractmethod
@@ -46,10 +46,9 @@ class IngestionJobStateProvider(
         pass
 
     def get_last_state(self, state_key: JobStateKey) -> Optional[JobStatesMap]:
-        previous_states = self.get_previous_states(
+        if previous_states := self.get_previous_states(
             state_key=state_key, last_only=True, filter_opt=None
-        )
-        if previous_states:
+        ):
             return previous_states[0]
         return None
 

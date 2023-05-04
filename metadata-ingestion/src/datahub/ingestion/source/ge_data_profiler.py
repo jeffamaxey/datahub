@@ -140,12 +140,12 @@ def get_column_unique_count_patch(self, column):
 def _get_column_quantiles_bigquery_patch(  # type:ignore
     self, column: str, quantiles: Iterable
 ) -> list:
-    quantile_queries = list()
-    for quantile in quantiles:
-        quantile_queries.append(
-            sa.text(f"approx_quantiles({column}, 100) OFFSET [{round(quantile * 100)}]")
+    quantile_queries = [
+        sa.text(
+            f"approx_quantiles({column}, 100) OFFSET [{round(quantile * 100)}]"
         )
-
+        for quantile in quantiles
+    ]
     quantiles_query = sa.select(quantile_queries).select_from(  # type:ignore
         self._table
     )
@@ -156,7 +156,7 @@ def _get_column_quantiles_bigquery_patch(  # type:ignore
     except ProgrammingError as pe:
         # This treat quantile exception will raise a formatted exception and there won't be any return value here
         self._treat_quantiles_exception(pe)
-        return list()
+        return []
 
 
 def _is_single_row_query_method(query: Any) -> bool:
@@ -169,7 +169,6 @@ def _is_single_row_query_method(query: Any) -> bool:
         "get_column_min",
         "get_column_max",
         "get_column_mean",
-        "get_column_stdev",
         "get_column_stdev",
         "get_column_nonnull_count",
         "get_column_unique_count",
@@ -280,18 +279,21 @@ class _SingleDatasetProfiler(BasicDatasetProfilerBase):
                 f"The profile of columns by pattern {self.dataset_name}({', '.join(sorted(ignored_columns))})"
             )
 
-        if self.config.max_number_of_fields_to_profile is not None:
-            if len(columns_to_profile) > self.config.max_number_of_fields_to_profile:
-                columns_being_dropped = columns_to_profile[
-                    self.config.max_number_of_fields_to_profile :
-                ]
-                columns_to_profile = columns_to_profile[
-                    : self.config.max_number_of_fields_to_profile
-                ]
+        if (
+            self.config.max_number_of_fields_to_profile is not None
+            and len(columns_to_profile)
+            > self.config.max_number_of_fields_to_profile
+        ):
+            columns_being_dropped = columns_to_profile[
+                self.config.max_number_of_fields_to_profile :
+            ]
+            columns_to_profile = columns_to_profile[
+                : self.config.max_number_of_fields_to_profile
+            ]
 
-                self.report.report_dropped(
-                    f"The max_number_of_fields_to_profile={self.config.max_number_of_fields_to_profile} reached. Profile of columns {self.dataset_name}({', '.join(sorted(columns_being_dropped))})"
-                )
+            self.report.report_dropped(
+                f"The max_number_of_fields_to_profile={self.config.max_number_of_fields_to_profile} reached. Profile of columns {self.dataset_name}({', '.join(sorted(columns_being_dropped))})"
+            )
         return columns_to_profile
 
     @_run_with_query_combiner
@@ -497,31 +499,25 @@ class _SingleDatasetProfiler(BasicDatasetProfilerBase):
 
             if self.config.include_field_null_count and non_null_count is not None:
                 null_count = row_count - non_null_count
-                if null_count < 0:
-                    null_count = 0
-
+                null_count = max(null_count, 0)
                 column_profile.nullCount = null_count
                 if row_count > 0:
                     column_profile.nullProportion = null_count / row_count
                     # Sometimes this value is bigger than 1 because of the approx queries
-                    if column_profile.nullProportion > 1:
-                        column_profile.nullProportion = 1
-
+                    column_profile.nullProportion = min(column_profile.nullProportion, 1)
             if unique_count is not None:
                 column_profile.uniqueCount = unique_count
                 if non_null_count is not None and non_null_count > 0:
                     column_profile.uniqueProportion = unique_count / non_null_count
                     # Sometimes this value is bigger than 1 because of the approx queries
-                    if column_profile.uniqueProportion > 1:
-                        column_profile.uniqueProportion = 1
-
+                    column_profile.uniqueProportion = min(column_profile.uniqueProportion, 1)
             self._get_dataset_column_sample_values(column_profile, column)
 
-            if (
-                type_ == ProfilerDataType.INT
-                or type_ == ProfilerDataType.FLOAT
-                or type_ == ProfilerDataType.NUMERIC
-            ):
+            if type_ in [
+                ProfilerDataType.INT,
+                ProfilerDataType.FLOAT,
+                ProfilerDataType.NUMERIC,
+            ]:
                 if cardinality == Cardinality.UNIQUE:
                     pass
                 elif cardinality in [
@@ -553,9 +549,6 @@ class _SingleDatasetProfiler(BasicDatasetProfilerBase):
                             column_profile,
                             column,
                         )
-                else:  # unknown cardinality - skip
-                    pass
-
             elif type_ == ProfilerDataType.STRING:
                 if cardinality in [
                     Cardinality.ONE,
@@ -585,17 +578,16 @@ class _SingleDatasetProfiler(BasicDatasetProfilerBase):
                         column,
                     )
 
-            else:
-                if cardinality in [
+            elif cardinality in [
                     Cardinality.ONE,
                     Cardinality.TWO,
                     Cardinality.VERY_FEW,
                     Cardinality.FEW,
                 ]:
-                    self._get_dataset_column_distinct_value_frequencies(
-                        column_profile,
-                        column,
-                    )
+                self._get_dataset_column_distinct_value_frequencies(
+                    column_profile,
+                    column,
+                )
 
         logger.debug(f"profiling {self.dataset_name}: flushing stage 3 queries")
         self.query_combiner.flush()
@@ -865,17 +857,16 @@ class DatahubGEProfiler:
         #     },
         # )
 
-        expectation_suite_name = ge_context.datasource_name + "." + pretty_name
+        expectation_suite_name = f"{ge_context.datasource_name}.{pretty_name}"
 
         ge_context.data_context.create_expectation_suite(
             expectation_suite_name=expectation_suite_name,
             overwrite_existing=True,
         )
-        batch = ge_context.data_context.get_batch(
+        return ge_context.data_context.get_batch(
             expectation_suite_name=expectation_suite_name,
             batch_kwargs={
                 "datasource": ge_context.datasource_name,
                 **batch_kwargs,
             },
         )
-        return batch

@@ -63,4 +63,3 @@ def test_rollback_editable():
     assert "editableDatasetProperties" in get_aspects_for_entity(entity_urn=dataset_urn, aspects=["editableDatasetProperties"], typed=False)
     # But first ingestion aspects should not be present
     assert "browsePaths" not in get_aspects_for_entity(entity_urn=dataset_urn, aspects=["browsePaths"], typed=False)
-    pass

@@ -292,11 +292,9 @@ class SQLAlchemyQueryCombiner:
 
         pending_queue = {k: v for k, v in full_queue.items() if not v.done}
 
-        pending_queue = dict(
+        if pending_queue := dict(
             itertools.islice(pending_queue.items(), MAX_QUERIES_TO_COMBINE_AT_ONCE)
-        )
-
-        if pending_queue:
+        ):
             queue_item = next(iter(pending_queue.values()))
 
             # Actually combine these queries together. We do this by (1) putting
@@ -309,13 +307,7 @@ class SQLAlchemyQueryCombiner:
             }
 
             combined_cols = itertools.chain(
-                *[
-                    [
-                        col  # .label(self._generate_sql_safe_identifier())
-                        for col in get_query_columns(cte)
-                    ]
-                    for _, cte in ctes.items()
-                ]
+                *[list(get_query_columns(cte)) for _, cte in ctes.items()]
             )
             combined_query = sqlalchemy.select(combined_cols)
             for cte in ctes.values():
@@ -332,7 +324,7 @@ class SQLAlchemyQueryCombiner:
 
             # Extract the results into a result for each query.
             index = 0
-            for _, query_future in pending_queue.items():
+            for query_future in pending_queue.values():
                 cols = query_future.query.columns
 
                 data = {}

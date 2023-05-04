@@ -37,8 +37,7 @@ def test_trino_usage_config():
 
 
 def yield_function(li):
-    for i in li:
-        yield i
+    yield from li
 
 
 @freeze_time(FROZEN_TIME)

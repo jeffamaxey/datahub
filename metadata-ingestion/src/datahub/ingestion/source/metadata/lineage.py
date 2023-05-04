@@ -83,8 +83,7 @@ class LineageFileSource(Source):
     @staticmethod
     def load_lineage_config(file_name: str) -> LineageConfig:
         config = load_config_file(file_name)
-        lineage_config = LineageConfig.parse_obj(config)
-        return lineage_config
+        return LineageConfig.parse_obj(config)
 
     @staticmethod
     def get_lineage_metadata_change_event_proposal(

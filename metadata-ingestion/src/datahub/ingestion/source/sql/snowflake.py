@@ -128,8 +128,7 @@ class SnowflakeSource(SQLAlchemySource):
                 engine = self.get_metadata_engine(database=db)
 
                 with engine.connect() as conn:
-                    inspector = inspect(conn)
-                    yield inspector
+                    yield inspect(conn)
             else:
                 self.report.report_dropped(db)
 
@@ -138,9 +137,9 @@ class SnowflakeSource(SQLAlchemySource):
         return f"{self.current_database.lower()}.{regular}"
 
     def _populate_view_upstream_lineage(self, engine: sqlalchemy.engine.Engine) -> None:
-        # NOTE: This query captures only the upstream lineage of a view (with no column lineage).
-        # For more details see: https://docs.snowflake.com/en/user-guide/object-dependencies.html#object-dependencies
-        # and also https://docs.snowflake.com/en/sql-reference/account-usage/access_history.html#usage-notes for current limitations on capturing the lineage for views.
+        assert self._lineage_map is not None
+        num_edges: int = 0
+
         view_upstream_lineage_query: str = """
 SELECT
   concat(
@@ -156,10 +155,6 @@ FROM
 WHERE
   referencing_object_domain in ('VIEW', 'MATERIALIZED VIEW')
         """
-
-        assert self._lineage_map is not None
-        num_edges: int = 0
-
         try:
             for db_row in engine.execute(view_upstream_lineage_query):
                 # Process UpstreamTable/View/ExternalTable/Materialized View->View edge.
@@ -178,8 +173,7 @@ WHERE
             self.warn(
                 logger,
                 "view_upstream_lineage",
-                "Extracting the upstream view lineage from Snowflake failed."
-                + f"Please check your permissions. Continuing...\nError was {e}.",
+                f"Extracting the upstream view lineage from Snowflake failed.Please check your permissions. Continuing...\nError was {e}.",
             )
         logger.info(f"A total of {num_edges} View upstream edges found.")
         self.report.num_table_to_view_edges_scanned = num_edges
@@ -233,9 +227,9 @@ WHERE
       query_start_time DESC
   ) = 1
         """.format(
-            start_time_millis=int(self.config.start_time.timestamp() * 1000)
-            if not self.config.ignore_start_time_lineage
-            else 0,
+            start_time_millis=0
+            if self.config.ignore_start_time_lineage
+            else int(self.config.start_time.timestamp() * 1000),
             end_time_millis=int(self.config.end_time.timestamp() * 1000),
         )
 
@@ -307,9 +301,9 @@ WHERE
     FROM external_table_lineage_history
     WHERE downstream_table_domain = 'Table'
     QUALIFY ROW_NUMBER() OVER (PARTITION BY downstream_table_name ORDER BY query_start_time DESC) = 1""".format(
-            start_time_millis=int(self.config.start_time.timestamp() * 1000)
-            if not self.config.ignore_start_time_lineage
-            else 0,
+            start_time_millis=0
+            if self.config.ignore_start_time_lineage
+            else int(self.config.start_time.timestamp() * 1000),
             end_time_millis=int(self.config.end_time.timestamp() * 1000),
         )
 
@@ -377,9 +371,9 @@ SELECT upstream_table_name, downstream_table_name, upstream_table_columns, downs
 FROM table_lineage_history
 WHERE upstream_table_domain in ('Table', 'External table') and downstream_table_domain = 'Table'
 QUALIFY ROW_NUMBER() OVER (PARTITION BY downstream_table_name, upstream_table_name ORDER BY query_start_time DESC) = 1        """.format(
-            start_time_millis=int(self.config.start_time.timestamp() * 1000)
-            if not self.config.ignore_start_time_lineage
-            else 0,
+            start_time_millis=0
+            if self.config.ignore_start_time_lineage
+            else int(self.config.start_time.timestamp() * 1000),
             end_time_millis=int(self.config.end_time.timestamp() * 1000),
         )
         num_edges: int = 0
@@ -681,17 +675,15 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY downstream_table_name, upstream_table_na
         dataset_params = dataset_name.split(".")
         if len(dataset_params) != 3:
             return True
-        if (
-            not self.config.database_pattern.allowed(dataset_params[0])
-            or not self.config.schema_pattern.allowed(dataset_params[1])
-            or not self.config.table_pattern.allowed(dataset_params[2])
-            or (
-                self.config.include_view_lineage
-                and not self.config.view_pattern.allowed(dataset_params[2])
+        return bool(
+            self.config.database_pattern.allowed(dataset_params[0])
+            and self.config.schema_pattern.allowed(dataset_params[1])
+            and self.config.table_pattern.allowed(dataset_params[2])
+            and (
+                not self.config.include_view_lineage
+                or self.config.view_pattern.allowed(dataset_params[2])
             )
-        ):
-            return False
-        return True
+        )
 
     # Stateful Ingestion specific overrides
     # NOTE: There is no special state associated with this source yet than what is provided by sql_common.

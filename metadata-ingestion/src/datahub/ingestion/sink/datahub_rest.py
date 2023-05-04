@@ -102,9 +102,7 @@ class DatahubRestSink(Sink):
                     # trim exception stacktraces when reporting warnings
                     if "stackTrace" in e.info:
                         try:
-                            e.info["stackTrace"] = "\n".join(
-                                e.info["stackTrace"].split("\n")[0:2]
-                            )
+                            e.info["stackTrace"] = "\n".join(e.info["stackTrace"].split("\n")[:2])
                         except Exception:
                             # ignore failures in trimming
                             pass

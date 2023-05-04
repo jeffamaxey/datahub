@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 # TODO: Support generating docs for each event type in entity registry.
 
 def capitalize_first(something: str) -> str:
-    return something[0:1].upper() + something[1:]
+    return something[:1].upper() + something[1:]
 
 
 class EntityCategory(Enum):
@@ -129,9 +129,7 @@ def add_name(self, name_attr, space_attr, new_schema):
 
 def load_schema_file(schema_file: str) -> None:
 
-    with open(schema_file) as f:
-        raw_schema_text = f.read()
-
+    raw_schema_text = Path(schema_file).read_text()
     avro_schema = avro.schema.parse(raw_schema_text)
 
     if (
@@ -162,7 +160,7 @@ def load_schema_file(schema_file: str) -> None:
                     entity_name, EntityDefinition(**entity_def)
                 )
                 entity_definition.aspect_map = get_aspects_from_snapshot(member_schema)
-                all_aspects = [a for a in entity_definition.aspect_map.keys()]
+                all_aspects = list(entity_definition.aspect_map.keys())
                 # in terms of order, we prefer the aspects from snapshot over the aspects from the config registry
                 # so we flip the aspect list here
                 for aspect_name in entity_definition.aspects:
@@ -201,8 +199,8 @@ class RelationshipGraph:
             label, src, dst, reason, id=edge_id or f"{src}:{label}:{dst}:{reason}"
         )
 
+        adjacency = self.map.get(src, RelationshipAdjacency())
         if src == dst:
-            adjacency = self.map.get(src, RelationshipAdjacency())
             for reln in adjacency.self_loop:
                 if relnship.id == reln.id:
                     print(f"Skipping adding edge since ids match {reln.id}")
@@ -210,7 +208,6 @@ class RelationshipGraph:
             adjacency.self_loop.append(relnship)
             self.map[src] = adjacency
         else:
-            adjacency = self.map.get(src, RelationshipAdjacency())
             for reln in adjacency.outgoing:
                 if relnship.id == reln.id:
                     logger.info(f"Skipping adding edge since ids match {reln.id}")
@@ -246,82 +243,80 @@ def make_relnship_docs(relationships: List[Relationship], direction: str) -> str
 
 
 def make_entity_docs(entity_display_name: str, graph: RelationshipGraph) -> str:
-    entity_name = entity_display_name[0:1].lower() + entity_display_name[1:]
-    entity_def: Optional[EntityDefinition] = entity_registry.get(entity_name, None)
-    if entity_def:
-        doc = entity_def.doc_file_contents or (
-            f"# {entity_def.display_name}\n{entity_def.doc}"
-            if entity_def.doc
-            else f"# {entity_def.display_name}"
-        )
-        # create aspects section
-        aspects_section = "\n## Aspects\n" if entity_def.aspects else ""
-
-        deprecated_aspects_section = ""
-        timeseries_aspects_section = ""
-
-        for aspect in entity_def.aspects or []:
-            aspect_definition: AspectDefinition = aspect_registry.get(aspect)
-            assert aspect_definition
-            deprecated_message = (
-                " (Deprecated)"
-                if aspect_definition.schema.get_prop("Deprecated")
-                else ""
-            )
-            timeseries_qualifier = (
-                " (Timeseries)" if aspect_definition.type == "timeseries" else ""
-            )
-            this_aspect_doc = ""
-            this_aspect_doc += (
-                f"\n### {aspect}{deprecated_message}{timeseries_qualifier}\n"
-            )
-            this_aspect_doc += f"{aspect_definition.schema.get_prop('doc')}\n"
-            this_aspect_doc += f"<details>\n<summary>Schema</summary>\n\n"
-            # breakpoint()
-            this_aspect_doc += f"```javascript\n{json.dumps(aspect_definition.schema.to_json(), indent=2)}\n```\n</details>\n"
-
-            if deprecated_message:
-                deprecated_aspects_section += this_aspect_doc
-            elif timeseries_qualifier:
-                timeseries_aspects_section += this_aspect_doc
-            else:
-                aspects_section += this_aspect_doc
-
-        aspects_section += timeseries_aspects_section + deprecated_aspects_section
-
-        # create relationships section
-        relationships_section = "\n## Relationships\n"
-        adjacency = graph.get_adjacency(entity_def.display_name)
-        if adjacency.self_loop:
-            relationships_section += f"\n### Self\nThese are the relationships to itself, stored in this entity's aspects"
-        for relnship in adjacency.self_loop:
-            relationships_section += (
-                f"\n- {relnship.name} ({relnship.doc[1:] if relnship.doc else ''})"
-            )
-
-        if adjacency.outgoing:
-            relationships_section += f"\n### Outgoing\nThese are the relationships stored in this entity's aspects"
-            relationships_section += make_relnship_docs(
-                adjacency.outgoing, direction="outgoing"
-            )
-
-        if adjacency.incoming:
-            relationships_section += f"\n### Incoming\nThese are the relationships stored in other entity's aspects"
-            relationships_section += make_relnship_docs(
-                adjacency.incoming, direction="incoming"
-            )
-
-        # create global metadata graph
-        global_graph_url = "https://github.com/datahub-project/datahub/raw/master/docs/imgs/datahub-metadata-model.png"
-        global_graph_section = (
-            f"\n## [Global Metadata Model]({global_graph_url})"
-            + f"\n![Global Graph]({global_graph_url})"
-        )
-        final_doc = doc + aspects_section + relationships_section + global_graph_section
-        generated_documentation[entity_name] = final_doc
-        return final_doc
-    else:
+    entity_name = entity_display_name[:1].lower() + entity_display_name[1:]
+    if not (entity_def := entity_registry.get(entity_name, None)):
         raise Exception(f"Failed to find information for entity: {entity_name}")
+    doc = entity_def.doc_file_contents or (
+        f"# {entity_def.display_name}\n{entity_def.doc}"
+        if entity_def.doc
+        else f"# {entity_def.display_name}"
+    )
+    # create aspects section
+    aspects_section = "\n## Aspects\n" if entity_def.aspects else ""
+
+    deprecated_aspects_section = ""
+    timeseries_aspects_section = ""
+
+    for aspect in entity_def.aspects or []:
+        aspect_definition: AspectDefinition = aspect_registry.get(aspect)
+        assert aspect_definition
+        deprecated_message = (
+            " (Deprecated)"
+            if aspect_definition.schema.get_prop("Deprecated")
+            else ""
+        )
+        timeseries_qualifier = (
+            " (Timeseries)" if aspect_definition.type == "timeseries" else ""
+        )
+        this_aspect_doc = ""
+        this_aspect_doc += (
+            f"\n### {aspect}{deprecated_message}{timeseries_qualifier}\n"
+        )
+        this_aspect_doc += f"{aspect_definition.schema.get_prop('doc')}\n"
+        this_aspect_doc += f"<details>\n<summary>Schema</summary>\n\n"
+        # breakpoint()
+        this_aspect_doc += f"```javascript\n{json.dumps(aspect_definition.schema.to_json(), indent=2)}\n```\n</details>\n"
+
+        if deprecated_message:
+            deprecated_aspects_section += this_aspect_doc
+        elif timeseries_qualifier:
+            timeseries_aspects_section += this_aspect_doc
+        else:
+            aspects_section += this_aspect_doc
+
+    aspects_section += timeseries_aspects_section + deprecated_aspects_section
+
+    # create relationships section
+    relationships_section = "\n## Relationships\n"
+    adjacency = graph.get_adjacency(entity_def.display_name)
+    if adjacency.self_loop:
+        relationships_section += f"\n### Self\nThese are the relationships to itself, stored in this entity's aspects"
+    for relnship in adjacency.self_loop:
+        relationships_section += (
+            f"\n- {relnship.name} ({relnship.doc[1:] if relnship.doc else ''})"
+        )
+
+    if adjacency.outgoing:
+        relationships_section += f"\n### Outgoing\nThese are the relationships stored in this entity's aspects"
+        relationships_section += make_relnship_docs(
+            adjacency.outgoing, direction="outgoing"
+        )
+
+    if adjacency.incoming:
+        relationships_section += f"\n### Incoming\nThese are the relationships stored in other entity's aspects"
+        relationships_section += make_relnship_docs(
+            adjacency.incoming, direction="incoming"
+        )
+
+    # create global metadata graph
+    global_graph_url = "https://github.com/datahub-project/datahub/raw/master/docs/imgs/datahub-metadata-model.png"
+    global_graph_section = (
+        f"\n## [Global Metadata Model]({global_graph_url})"
+        + f"\n![Global Graph]({global_graph_url})"
+    )
+    final_doc = doc + aspects_section + relationships_section + global_graph_section
+    generated_documentation[entity_name] = final_doc
+    return final_doc
 
 
 def generate_stitched_record(relnships_graph: RelationshipGraph) -> List[Any]:
@@ -527,9 +522,7 @@ def load_registry_file(registry_file: str) -> Dict[str, EntityDefinition]:
 
     with open(registry_file, "r") as f:
         registry = EntityRegistry.parse_obj(yaml.safe_load(f))
-        index: int = 0
-        for entity_def in registry.entities:
-            index += 1
+        for index, entity_def in enumerate(registry.entities, start=1):
             entity_def.priority = index
             entity_registry[entity_def.name] = entity_def
     return entity_registry
@@ -559,18 +552,17 @@ def get_sorted_entity_names(
         x for (x, y) in internal_entities if not y.priority
     ]
 
-    sorted_entities = [
+    return [
         (
             EntityCategory.CORE,
             priority_bearing_core_entities + non_priority_core_entities,
         ),
         (
             EntityCategory.INTERNAL,
-            priority_bearing_internal_entities + non_priority_internal_entities,
+            priority_bearing_internal_entities
+            + non_priority_internal_entities,
         ),
     ]
-
-    return sorted_entities
 
 
 def preprocess_markdown(markdown_contents: str) -> str:
@@ -579,7 +571,7 @@ def preprocess_markdown(markdown_contents: str) -> str:
     content_swap_register = {}
     while inline_pattern.search(markdown_contents, pos=pos):
         match = inline_pattern.search(markdown_contents, pos=pos)
-        file_name = match.group(1)
+        file_name = match[1]
         with open(file_name, "r") as fp:
             inline_content = fp.read()
             content_swap_register[match.span()] = inline_content
@@ -620,9 +612,8 @@ def generate(
     entity_extra_docs = {}
     if extra_docs:
         for path in glob.glob(f"{extra_docs}/**/*.md", recursive=True):
-            m = re.search("/docs/entities/(.*)/*.md", path)
-            if m:
-                entity_name = m.group(1)
+            if m := re.search("/docs/entities/(.*)/*.md", path):
+                entity_name = m[1]
                 with open(path, "r") as doc_file:
                     file_contents = doc_file.read()
                     final_markdown = preprocess_markdown(file_contents)

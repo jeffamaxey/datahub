@@ -108,17 +108,12 @@ class AzureADSource(Source):
     def get_token(self):
         token_response = requests.post(self.config.token_url, data=self.token_data)
         if token_response.status_code == 200:
-            token = token_response.json().get("access_token")
-            return token
-        else:
-            error_str = (
-                f"Token response status code: {str(token_response.status_code)}. "
-                f"Token response content: {str(token_response.content)}"
-            )
-            logger.error(error_str)
-            self.report.report_failure("get_token", error_str)
-            click.echo("Error: Token response invalid")
-            exit()
+            return token_response.json().get("access_token")
+        error_str = f"Token response status code: {token_response.status_code}. Token response content: {str(token_response.content)}"
+        logger.error(error_str)
+        self.report.report_failure("get_token", error_str)
+        click.echo("Error: Token response invalid")
+        exit()
 
     def get_workunits(self) -> Iterable[MetadataWorkUnit]:
         # for future developers: The actual logic of this ingestion wants to be executed, in order:
@@ -226,15 +221,15 @@ class AzureADSource(Source):
         azure_ad_user: dict,
         user_urn_to_group_membership: Dict[str, GroupMembershipClass],
     ) -> None:
-        user_urn = self._map_azure_ad_user_to_urn(azure_ad_user)
-        if not user_urn:
-            error_str = f"Failed to extract DataHub Username from Azure ADUser {azure_ad_user.get('displayName')}. Skipping..."
-            self.report.report_failure("azure_ad_user_mapping", error_str)
-        else:
+        if user_urn := self._map_azure_ad_user_to_urn(azure_ad_user):
             self.azure_ad_groups_users.append(azure_ad_user)
             # update/create the GroupMembership aspect for this group member.
             if group_urn not in user_urn_to_group_membership[user_urn].groups:
                 user_urn_to_group_membership[user_urn].groups.append(group_urn)
+
+        else:
+            error_str = f"Failed to extract DataHub Username from Azure ADUser {azure_ad_user.get('displayName')}. Skipping..."
+            self.report.report_failure("azure_ad_user_mapping", error_str)
 
     def ingest_ad_users(
         self,
@@ -245,7 +240,7 @@ class AzureADSource(Source):
             # Add GroupMembership if applicable
             if (
                 datahub_corp_user_snapshot.urn
-                in datahub_corp_user_urn_to_group_membership.keys()
+                in datahub_corp_user_urn_to_group_membership
             ):
                 datahub_group_membership = (
                     datahub_corp_user_urn_to_group_membership.get(
@@ -277,7 +272,7 @@ class AzureADSource(Source):
         yield from self._get_azure_ad_data(kind=kind)
 
     def _get_azure_ad_data(self, kind: str) -> Iterable[List]:
-        headers = {"Authorization": "Bearer {}".format(self.token)}
+        headers = {"Authorization": f"Bearer {self.token}"}
         #           'ConsistencyLevel': 'eventual'}
         url = self.config.graph_url + kind
         while True:
@@ -293,10 +288,7 @@ class AzureADSource(Source):
                     url = False  # type: ignore
                 yield json_data["value"]
             else:
-                error_str = (
-                    f"Response status code: {str(response.status_code)}. "
-                    f"Response content: {str(response.content)}"
-                )
+                error_str = f"Response status code: {response.status_code}. Response content: {str(response.content)}"
                 logger.error(error_str)
                 self.report.report_failure("_get_azure_ad_data_", error_str)
                 continue
@@ -306,13 +298,9 @@ class AzureADSource(Source):
         try:
             result = func(id_to_extract)
         except Exception as e:
-            error_str = "Failed to extract DataHub {} from Azure AD {} with name {} due to '{}'".format(
-                id_type, id_type, id_to_extract.get("displayName"), repr(e)
-            )
+            error_str = f"""Failed to extract DataHub {id_type} from Azure AD {id_type} with name {id_to_extract.get("displayName")} due to '{repr(e)}'"""
         if not result:
-            error_str = "Failed to extract DataHub {} from Azure AD {} with name {} due to unknown reason".format(
-                id_type, id_type, id_to_extract.get("displayName")
-            )
+            error_str = f'Failed to extract DataHub {id_type} from Azure AD {id_type} with name {id_to_extract.get("displayName")} due to unknown reason'
         if error_str is not None:
             logger.error(error_str)
             self.report.report_failure(mapping_identifier, error_str)
@@ -400,9 +388,7 @@ class AzureADSource(Source):
     # Creates DataHub CorpUser Urn from Azure AD User object
     def _map_azure_ad_user_to_urn(self, azure_ad_user):
         user_name = self._map_azure_ad_user_to_user_name(azure_ad_user)
-        if not user_name:
-            return None
-        return make_user_urn(user_name)
+        return make_user_urn(user_name) if user_name else None
 
     def _map_azure_ad_user_to_corp_user(self, azure_ad_user):
         full_name = (

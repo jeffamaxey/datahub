@@ -51,22 +51,22 @@ def _perform_leak_detection() -> None:
             else:
                 unique_traces_to_objects[id(obj)].append(obj)
     logger.info("Potentially leaking objects start")
-    for key, obj_list in sorted(
-        unique_traces_to_objects.items(),
-        key=lambda item: sum([sys.getsizeof(o) for o in item[1]]),
-        reverse=True,
-    ):
+    for key, obj_list in sorted(unique_traces_to_objects.items(), key=lambda item: sum(sys.getsizeof(o) for o in item[1]), reverse=True):
         if isinstance(key, tracemalloc.Traceback):
             obj_traceback: tracemalloc.Traceback = cast(tracemalloc.Traceback, key)
             logger.info(
-                f"#Objects:{len(obj_list)}; Total memory:{sum([sys.getsizeof(obj) for obj in obj_list])};"
-                + " Allocation Trace:\n\t"
+                (
+                    f"#Objects:{len(obj_list)}; Total memory:{sum(sys.getsizeof(obj) for obj in obj_list)};"
+                    + " Allocation Trace:\n\t"
+                )
                 + "\n\t".join(obj_traceback.format(limit=25))
             )
         else:
             logger.info(
-                f"#Objects:{len(obj_list)}; Total memory:{sum([sys.getsizeof(obj) for obj in obj_list])};"
-                + " No Allocation Trace available!"
+                (
+                    f"#Objects:{len(obj_list)}; Total memory:{sum(sys.getsizeof(obj) for obj in obj_list)};"
+                    + " No Allocation Trace available!"
+                )
             )
         # Print details about the live referrers of each object in the obj_list (same trace).
         for obj in obj_list:

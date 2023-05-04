@@ -134,17 +134,15 @@ class DataHubGraph(DatahubRestEmitter):
         response.raise_for_status()
         response_json = response.json()
         if not aspect_type_name:
-            record_schema: RecordSchema = aspect_type.__getattribute__(
+            if record_schema := aspect_type.__getattribute__(
                 aspect_type, "RECORD_SCHEMA"
-            )
-            if not record_schema:
+            ):
+                aspect_type_name = record_schema.fullname.replace(".pegasus2avro", "")
+            else:
                 logger.warning(
                     f"Failed to infer type name of the aspect from the aspect type class {aspect_type}. Please provide an aspect_type_name. Continuing, but this will fail."
                 )
-            else:
-                aspect_type_name = record_schema.fullname.replace(".pegasus2avro", "")
-        aspect_json = response_json.get("aspect", {}).get(aspect_type_name)
-        if aspect_json:
+        if aspect_json := response_json.get("aspect", {}).get(aspect_type_name):
             return aspect_type.from_obj(aspect_json, tuples=True)
         else:
             raise OperationalError(
@@ -199,13 +197,13 @@ class DataHubGraph(DatahubRestEmitter):
                 return None
             json_resp = response.json()
             all_aspects = json_resp.get("value", {}).get("values", [])
-            for aspect in all_aspects:
-                if aspect.get("aspect") and aspect.get("aspect").get("value"):
-                    usage_aspects.append(
-                        DatasetUsageStatisticsClass.from_obj(
-                            json.loads(aspect.get("aspect").get("value")), tuples=True
-                        )
-                    )
+            usage_aspects.extend(
+                DatasetUsageStatisticsClass.from_obj(
+                    json.loads(aspect.get("aspect").get("value")), tuples=True
+                )
+                for aspect in all_aspects
+                if aspect.get("aspect") and aspect.get("aspect").get("value")
+            )
             return usage_aspects
         except Exception as e:
             logger.error("Error while getting usage aspects.", e)
@@ -255,11 +253,9 @@ class DataHubGraph(DatahubRestEmitter):
         }
         end_point = f"{self.config.server}/aspects?action=getTimeseriesAspectValues"
         resp: Dict = self._post_generic(end_point, query_body)
-        values: list = resp.get("value", {}).get("values")
-        if values:
+        if values := resp.get("value", {}).get("values"):
             assert len(values) == 1
-            aspect_json: str = values[0].get("aspect", {}).get("value")
-            if aspect_json:
+            if aspect_json := values[0].get("aspect", {}).get("value"):
                 return aspect_type.from_obj(json.loads(aspect_json), tuples=False)
             else:
                 raise OperationalError(

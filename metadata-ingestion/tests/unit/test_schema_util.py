@@ -68,11 +68,9 @@ def log_field_paths(fields: List[SchemaField]) -> None:
 
 
 def assert_field_paths_are_unique(fields: List[SchemaField]) -> None:
-    avro_fields_paths = [
+    if avro_fields_paths := [
         f.fieldPath for f in fields if re.match(".*[^]]$", f.fieldPath)
-    ]
-
-    if avro_fields_paths:
+    ]:
         assert len(avro_fields_paths) == len(set(avro_fields_paths))
 
 

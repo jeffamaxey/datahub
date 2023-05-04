@@ -144,8 +144,7 @@ def main(**kwargs):
         sys.exit(1)
     except Exception as exc:
         kwargs = {}
-        sensitive_cause = SensitiveError.get_sensitive_cause(exc)
-        if sensitive_cause:
+        if sensitive_cause := SensitiveError.get_sensitive_cause(exc):
             kwargs = {"show_vals": None}
             exc = sensitive_cause
 

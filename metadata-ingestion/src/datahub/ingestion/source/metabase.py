@@ -366,13 +366,11 @@ class MetabaseSource(Source):
             "filter", []
         )
 
-        custom_properties = {
+        return {
             "Metrics": ", ".join(metrics),
             "Filters": f"{filters}" if len(filters) else "",
             "Dimensions": ", ".join(dimensions),
         }
-
-        return custom_properties
 
     def get_datasource_urn(self, card_details):
         platform, database_name, platform_instance = self.get_datasource_from_id(
@@ -390,9 +388,7 @@ class MetabaseSource(Source):
             if source_table_id is not None:
                 schema_name, table_name = self.get_source_table_from_id(source_table_id)
                 if table_name:
-                    source_paths.add(
-                        f"{schema_name + '.' if schema_name else ''}{table_name}"
-                    )
+                    source_paths.add(f"{f'{schema_name}.' if schema_name else ''}{table_name}")
         else:
             try:
                 raw_query = (
@@ -420,9 +416,9 @@ class MetabaseSource(Source):
 
         # Create dataset URNs
         dataset_urn = []
-        dbname = f"{database_name + '.' if database_name else ''}"
+        dbname = f"{f'{database_name}.' if database_name else ''}"
         source_tables = list(map(lambda tbl: f"{dbname}{tbl}", source_paths))
-        dataset_urn = [
+        return [
             builder.make_dataset_urn_with_platform_instance(
                 platform=platform,
                 name=name,
@@ -431,8 +427,6 @@ class MetabaseSource(Source):
             )
             for name in source_tables
         ]
-
-        return dataset_urn
 
     @lru_cache(maxsize=None)
     def get_source_table_from_id(self, table_id):
@@ -484,7 +478,7 @@ class MetabaseSource(Source):
         }
 
         if self.config.engine_platform_map is not None:
-            engine_mapping.update(self.config.engine_platform_map)
+            engine_mapping |= self.config.engine_platform_map
 
         if engine in engine_mapping:
             platform = engine_mapping[engine]

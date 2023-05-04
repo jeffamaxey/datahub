@@ -11,23 +11,19 @@ spark = SparkSession \
     .getOrCreate()
 
 def tbl(tbl_name):
-  return TEST_DB + "." + tbl_name
+  return f"{TEST_DB}.{tbl_name}"
 
-spark.sql("DROP DATABASE IF EXISTS " + TEST_DB)  
-spark.sql("CREATE DATABASE IF NOT EXISTS " + TEST_DB)
+spark.sql(f"DROP DATABASE IF EXISTS {TEST_DB}")
+spark.sql(f"CREATE DATABASE IF NOT EXISTS {TEST_DB}")
 spark.sql("DROP TABLE IF EXISTS " + tbl("foo4"))
 
-df1 = spark.read \
-        .option("header", "true") \
-        .csv(DATA_DIR + "/in1.csv") \
-        .withColumnRenamed("c1", "a") \
-        .withColumnRenamed("c2", "b")
+df1 = (spark.read.option("header",
+                         "true").csv(f"{DATA_DIR}/in1.csv").withColumnRenamed(
+                             "c1", "a").withColumnRenamed("c2", "b"))
 
-df2 = spark.read \
-        .option("header", "true") \
-        .csv(DATA_DIR + "/in2.csv") \
-        .withColumnRenamed("c1", "c") \
-        .withColumnRenamed("c2", "d")
+df2 = (spark.read.option("header",
+                         "true").csv(f"{DATA_DIR}/in2.csv").withColumnRenamed(
+                             "c1", "c").withColumnRenamed("c2", "d"))
 
 df = df1.join(df2, "id").drop("id")
 

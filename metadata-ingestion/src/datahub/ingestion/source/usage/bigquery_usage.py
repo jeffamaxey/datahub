@@ -257,29 +257,23 @@ class BigQueryTableRef:
         return self.dataset.startswith("_")
 
     def remove_extras(self) -> "BigQueryTableRef":
-        # Handle partitioned and sharded tables.
-        matches = PARTITIONED_TABLE_REGEX.match(self.table)
-        if matches:
+        if matches := PARTITIONED_TABLE_REGEX.match(self.table):
             table_name = matches.group(1)
             logger.debug(
                 f"Found partitioned table {self.table}. Using {table_name} as the table name."
             )
             return BigQueryTableRef(self.project, self.dataset, table_name)
 
-        # Handle table snapshots.
-        matches = SNAPSHOT_TABLE_REGEX.match(self.table)
-        if matches:
+        if matches := SNAPSHOT_TABLE_REGEX.match(self.table):
             table_name = matches.group(1)
             logger.debug(
                 f"Found table snapshot {self.table}. Using {table_name} as the table name."
             )
             return BigQueryTableRef(self.project, self.dataset, table_name)
 
-        # Handle exceptions
-        invalid_chars_in_table_name: List[str] = [
+        if invalid_chars_in_table_name := [
             c for c in {"$", "@"} if c in self.table
-        ]
-        if invalid_chars_in_table_name:
+        ]:
             raise ValueError(
                 f"Cannot handle {self} - poorly formatted table name, contains {invalid_chars_in_table_name}"
             )
@@ -300,10 +294,7 @@ def _table_ref_to_urn(ref: BigQueryTableRef, env: str) -> str:
 
 
 def _job_name_ref(project: str, jobId: str) -> Optional[str]:
-    if project and jobId:
-        return f"projects/{project}/jobs/{jobId}"
-    else:
-        return None
+    return f"projects/{project}/jobs/{jobId}" if project and jobId else None
 
 
 @dataclass
@@ -360,10 +351,7 @@ class ReadEvent:
 
         # https://cloud.google.com/bigquery/docs/reference/auditlogs/rest/Shared.Types/BigQueryAuditMetadata.TableDataRead.Reason
         readReason = readInfo.get("reason")
-        jobName = None
-        if readReason == "JOB":
-            jobName = readInfo.get("jobName")
-
+        jobName = readInfo.get("jobName") if readReason == "JOB" else None
         readEvent = ReadEvent(
             actor_email=user,
             timestamp=entry.timestamp,
@@ -394,10 +382,7 @@ class ReadEvent:
 
         # https://cloud.google.com/bigquery/docs/reference/auditlogs/rest/Shared.Types/BigQueryAuditMetadata.TableDataRead.Reason
         readReason = readInfo.get("reason")
-        jobName = None
-        if readReason == "JOB":
-            jobName = readInfo.get("jobName")
-
+        jobName = readInfo.get("jobName") if readReason == "JOB" else None
         readEvent = ReadEvent(
             actor_email=user,
             timestamp=row["timestamp"],
@@ -458,9 +443,7 @@ class QueryEvent:
         query_event.jobName = _job_name_ref(
             job.get("jobName", {}).get("projectId"), job.get("jobName", {}).get("jobId")
         )
-        # destinationTable
-        raw_dest_table = job_query_conf.get("destinationTable")
-        if raw_dest_table:
+        if raw_dest_table := job_query_conf.get("destinationTable"):
             query_event.destinationTable = BigQueryTableRef.from_spec_obj(
                 raw_dest_table
             )
@@ -468,14 +451,11 @@ class QueryEvent:
         query_event.statementType = job_query_conf.get("statementType")
         # referencedTables
         job_stats: Dict = job["jobStatistics"]
-        raw_ref_tables = job_stats.get("referencedTables")
-        if raw_ref_tables:
+        if raw_ref_tables := job_stats.get("referencedTables"):
             query_event.referencedTables = [
                 BigQueryTableRef.from_spec_obj(spec) for spec in raw_ref_tables
             ]
-        # referencedViews
-        raw_ref_views = job_stats.get("referencedViews")
-        if raw_ref_views:
+        if raw_ref_views := job_stats.get("referencedViews"):
             query_event.referencedViews = [
                 BigQueryTableRef.from_spec_obj(spec) for spec in raw_ref_views
             ]
@@ -520,22 +500,17 @@ class QueryEvent:
         )
         # jobName
         query_event.jobName = job.get("jobName")
-        # destinationTable
-        raw_dest_table = query_config.get("destinationTable")
-        if raw_dest_table:
+        if raw_dest_table := query_config.get("destinationTable"):
             query_event.destinationTable = BigQueryTableRef.from_string_name(
                 raw_dest_table
             )
         # referencedTables
         query_stats: Dict = job["jobStats"]["queryStats"]
-        raw_ref_tables = query_stats.get("referencedTables")
-        if raw_ref_tables:
+        if raw_ref_tables := query_stats.get("referencedTables"):
             query_event.referencedTables = [
                 BigQueryTableRef.from_string_name(spec) for spec in raw_ref_tables
             ]
-        # referencedViews
-        raw_ref_views = query_stats.get("referencedViews")
-        if raw_ref_views:
+        if raw_ref_views := query_stats.get("referencedViews"):
             query_event.referencedViews = [
                 BigQueryTableRef.from_string_name(spec) for spec in raw_ref_views
             ]
@@ -565,9 +540,7 @@ class QueryEvent:
             query=query_config["query"],
         )
         query_event.jobName = job.get("jobName")
-        # destinationTable
-        raw_dest_table = query_config.get("destinationTable")
-        if raw_dest_table:
+        if raw_dest_table := query_config.get("destinationTable"):
             query_event.destinationTable = BigQueryTableRef.from_string_name(
                 raw_dest_table
             )
@@ -575,14 +548,11 @@ class QueryEvent:
         query_event.statementType = query_config.get("statementType")
         # referencedTables
         query_stats: Dict = job["jobStats"]["queryStats"]
-        raw_ref_tables = query_stats.get("referencedTables")
-        if raw_ref_tables:
+        if raw_ref_tables := query_stats.get("referencedTables"):
             query_event.referencedTables = [
                 BigQueryTableRef.from_string_name(spec) for spec in raw_ref_tables
             ]
-        # referencedViews
-        raw_ref_views = query_stats.get("referencedViews")
-        if raw_ref_views:
+        if raw_ref_views := query_stats.get("referencedViews"):
             query_event.referencedViews = [
                 BigQueryTableRef.from_string_name(spec) for spec in raw_ref_views
             ]
@@ -845,7 +815,7 @@ class BigQueryUsageSource(Source):
 
         list_entry_generators_across_clients: List[
             Iterable[Union[AuditLogEntry, BigQueryAuditMetadata]]
-        ] = list()
+        ] = []
         for client in clients:
             try:
                 list_entries: Iterable[
@@ -880,54 +850,57 @@ class BigQueryUsageSource(Source):
     def _create_operation_aspect_work_unit(
         self, event: QueryEvent
     ) -> Optional[MetadataWorkUnit]:
-        if event.statementType in OPERATION_STATEMENT_TYPES and event.destinationTable:
-            destination_table: BigQueryTableRef
-            try:
-                destination_table = event.destinationTable.remove_extras()
-            except Exception as e:
-                self.report.report_warning(
-                    str(event.destinationTable),
-                    f"Failed to clean up destination table, {e}",
-                )
-                return None
-            last_updated_timestamp: int = int(event.timestamp.timestamp() * 1000)
-            affected_datasets = []
-            if event.referencedTables:
-                for table in event.referencedTables:
-                    try:
-                        affected_datasets.append(
-                            _table_ref_to_urn(
-                                table.remove_extras(),
-                                self.config.env,
-                            )
+        if (
+            event.statementType not in OPERATION_STATEMENT_TYPES
+            or not event.destinationTable
+        ):
+            return None
+        destination_table: BigQueryTableRef
+        try:
+            destination_table = event.destinationTable.remove_extras()
+        except Exception as e:
+            self.report.report_warning(
+                str(event.destinationTable),
+                f"Failed to clean up destination table, {e}",
+            )
+            return None
+        last_updated_timestamp: int = int(event.timestamp.timestamp() * 1000)
+        affected_datasets = []
+        if event.referencedTables:
+            for table in event.referencedTables:
+                try:
+                    affected_datasets.append(
+                        _table_ref_to_urn(
+                            table.remove_extras(),
+                            self.config.env,
                         )
-                    except Exception as e:
-                        self.report.report_warning(
-                            str(table),
-                            f"Failed to clean up table, {e}",
-                        )
-            operation_aspect = OperationClass(
-                timestampMillis=last_updated_timestamp,
-                lastUpdatedTimestamp=last_updated_timestamp,
-                actor=builder.make_user_urn(event.actor_email.split("@")[0]),
-                operationType=OPERATION_STATEMENT_TYPES[event.statementType],
-                affectedDatasets=affected_datasets,
-            )
-            mcp = MetadataChangeProposalWrapper(
-                entityType="dataset",
-                aspectName="operation",
-                changeType=ChangeTypeClass.UPSERT,
-                entityUrn=_table_ref_to_urn(
-                    destination_table,
-                    env=self.config.env,
-                ),
-                aspect=operation_aspect,
-            )
-            return MetadataWorkUnit(
-                id=f"{event.timestamp.isoformat()}-operation-aspect-{destination_table}",
-                mcp=mcp,
-            )
-        return None
+                    )
+                except Exception as e:
+                    self.report.report_warning(
+                        str(table),
+                        f"Failed to clean up table, {e}",
+                    )
+        operation_aspect = OperationClass(
+            timestampMillis=last_updated_timestamp,
+            lastUpdatedTimestamp=last_updated_timestamp,
+            actor=builder.make_user_urn(event.actor_email.split("@")[0]),
+            operationType=OPERATION_STATEMENT_TYPES[event.statementType],
+            affectedDatasets=affected_datasets,
+        )
+        mcp = MetadataChangeProposalWrapper(
+            entityType="dataset",
+            aspectName="operation",
+            changeType=ChangeTypeClass.UPSERT,
+            entityUrn=_table_ref_to_urn(
+                destination_table,
+                env=self.config.env,
+            ),
+            aspect=operation_aspect,
+        )
+        return MetadataWorkUnit(
+            id=f"{event.timestamp.isoformat()}-operation-aspect-{destination_table}",
+            mcp=mcp,
+        )
 
     def _parse_bigquery_log_entries(
         self, entries: Iterable[Union[AuditLogEntry, BigQueryAuditMetadata]]
@@ -953,8 +926,7 @@ class BigQueryUsageSource(Source):
                     self.report.num_filtered_events += 1
                     continue
                 self.report.num_query_events += 1
-                wu = self._create_operation_aspect_work_unit(event)
-                if wu:
+                if wu := self._create_operation_aspect_work_unit(event):
                     yield wu
 
             missing_query_entry_v2 = QueryEvent.get_missing_key_entry_v2(entry)
@@ -965,8 +937,7 @@ class BigQueryUsageSource(Source):
                     self.report.num_filtered_events += 1
                     continue
                 self.report.num_query_events += 1
-                wu = self._create_operation_aspect_work_unit(event)
-                if wu:
+                if wu := self._create_operation_aspect_work_unit(event):
                     yield wu
 
             if event is None:
@@ -994,8 +965,7 @@ class BigQueryUsageSource(Source):
             )
             if missing_query_event_exported_audit is None:
                 event = QueryEvent.from_exported_bigquery_audit_metadata(audit_metadata)
-                wu = self._create_operation_aspect_work_unit(event)
-                if wu:
+                if wu := self._create_operation_aspect_work_unit(event):
                     yield wu
 
             missing_read_event_exported_audit = (

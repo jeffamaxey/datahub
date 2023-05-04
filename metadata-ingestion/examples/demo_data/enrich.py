@@ -67,8 +67,7 @@ def parse_directive(row: Dict) -> Directive:
 def fetch_directives() -> List[Directive]:
     with open(DIRECTIVES_CSV, "r") as f:
         reader = csv.DictReader(f)
-        rows = [parse_directive(row) for row in reader]
-        return rows
+        return [parse_directive(row) for row in reader]
 
 
 def dataset_name_to_urn(name: str) -> str:
@@ -76,8 +75,7 @@ def dataset_name_to_urn(name: str) -> str:
 
 
 def clean_owner_name(name: str) -> str:
-    clean = "".join(c for c in name if c.isalpha())
-    return clean
+    return "".join(c for c in name if c.isalpha())
 
 
 def owner_name_to_urn(name: str) -> str:

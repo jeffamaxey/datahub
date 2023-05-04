@@ -103,7 +103,7 @@ def _platform_alchemy_uri_tester_gen(
     platform: str, opt_starts_with: Optional[str] = None
 ) -> Tuple[str, Callable[[str], bool]]:
     return platform, lambda x: x.startswith(
-        platform if not opt_starts_with else opt_starts_with
+        opt_starts_with if opt_starts_with else platform
     )
 
 
@@ -138,11 +138,14 @@ PLATFORM_TO_SQLALCHEMY_URI_TESTER_MAP: Dict[str, Callable[[str], bool]] = Ordere
 
 def get_platform_from_sqlalchemy_uri(sqlalchemy_uri: str) -> str:
 
-    for platform, tester in PLATFORM_TO_SQLALCHEMY_URI_TESTER_MAP.items():
-        if tester(sqlalchemy_uri):
-            return platform
-
-    return "external"
+    return next(
+        (
+            platform
+            for platform, tester in PLATFORM_TO_SQLALCHEMY_URI_TESTER_MAP.items()
+            if tester(sqlalchemy_uri)
+        ),
+        "external",
+    )
 
 
 def make_sqlalchemy_uri(
@@ -269,17 +272,17 @@ class BasicSQLAlchemyConfig(SQLAlchemyConfig):
     sqlalchemy_uri: Optional[str] = None
 
     def get_sql_alchemy_url(self, uri_opts: Optional[Dict[str, Any]] = None) -> str:
-        if not ((self.host_port and self.scheme) or self.sqlalchemy_uri):
+        if self.host_port and self.scheme or self.sqlalchemy_uri:
+            return self.sqlalchemy_uri or make_sqlalchemy_uri(
+                self.scheme,  # type: ignore
+                self.username,
+                self.password.get_secret_value() if self.password else None,
+                self.host_port,  # type: ignore
+                self.database,
+                uri_opts=uri_opts,
+            )
+        else:
             raise ValueError("host_port and schema or connect_uri required.")
-
-        return self.sqlalchemy_uri or make_sqlalchemy_uri(
-            self.scheme,  # type: ignore
-            self.username,
-            self.password.get_secret_value() if self.password else None,
-            self.host_port,  # type: ignore
-            self.database,
-            uri_opts=uri_opts,
-        )
 
 
 class SqlWorkUnit(MetadataWorkUnit):
@@ -361,11 +364,14 @@ def get_column_type(
     Maps SQLAlchemy types (https://docs.sqlalchemy.org/en/13/core/type_basics.html) to corresponding schema types
     """
 
-    TypeClass: Optional[Type] = None
-    for sql_type in _field_type_mapping.keys():
-        if isinstance(column_type, sql_type):
-            TypeClass = _field_type_mapping[sql_type]
-            break
+    TypeClass: Optional[Type] = next(
+        (
+            _field_type_mapping[sql_type]
+            for sql_type in _field_type_mapping.keys()
+            if isinstance(column_type, sql_type)
+        ),
+        None,
+    )
     if TypeClass is None:
         for sql_type in _known_unknown_field_types:
             if isinstance(column_type, sql_type):
@@ -479,8 +485,7 @@ class SQLAlchemySource(StatefulIngestionSourceBase):
         logger.debug(f"sql_alchemy_url={url}")
         engine = create_engine(url, **self.config.options)
         with engine.connect() as conn:
-            inspector = inspect(conn)
-            yield inspector
+            yield inspect(conn)
 
     def get_db_name(self, inspector: Inspector) -> str:
         engine = inspector.engine
@@ -491,15 +496,14 @@ class SQLAlchemySource(StatefulIngestionSourceBase):
             raise Exception("Unable to get database name from Sqlalchemy inspector")
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
-        if (
-            job_id == self.get_default_ingestion_job_id()
-            and self.is_stateful_ingestion_configured()
-            and self.config.stateful_ingestion
-            and self.config.stateful_ingestion.remove_stale_metadata
-        ):
-            return True
-
-        return False
+        return bool(
+            (
+                job_id == self.get_default_ingestion_job_id()
+                and self.is_stateful_ingestion_configured()
+                and self.config.stateful_ingestion
+                and self.config.stateful_ingestion.remove_stale_metadata
+            )
+        )
 
     def get_default_ingestion_job_id(self) -> JobId:
         """
@@ -783,8 +787,7 @@ class SQLAlchemySource(StatefulIngestionSourceBase):
         sql_config: SQLAlchemyConfig,
     ) -> Iterable[Union[MetadataWorkUnit]]:
 
-        domain_urn = self._gen_domain_urn(dataset_name)
-        if domain_urn:
+        if domain_urn := self._gen_domain_urn(dataset_name):
             wus = add_domain_to_entity_wu(
                 entity_type=entity_type,
                 entity_urn=entity_urn,
@@ -915,8 +918,9 @@ class SQLAlchemySource(StatefulIngestionSourceBase):
         wu = SqlWorkUnit(id=dataset_name, mce=mce)
         self.report.report_workunit(wu)
         yield wu
-        dpi_aspect = self.get_dataplatform_instance_aspect(dataset_urn=dataset_urn)
-        if dpi_aspect:
+        if dpi_aspect := self.get_dataplatform_instance_aspect(
+            dataset_urn=dataset_urn
+        ):
             yield dpi_aspect
         subtypes_aspect = MetadataWorkUnit(
             id=f"{dataset_name}-subtypes",
@@ -1128,12 +1132,7 @@ class SQLAlchemySource(StatefulIngestionSourceBase):
             properties = view_info.get("properties", {})
         try:
             view_definition = inspector.get_view_definition(view, schema)
-            if view_definition is None:
-                view_definition = ""
-            else:
-                # Some dialects return a TextClause instead of a raw string,
-                # so we need to convert them to a string.
-                view_definition = str(view_definition)
+            view_definition = "" if view_definition is None else str(view_definition)
         except NotImplementedError:
             view_definition = ""
         properties["view_definition"] = view_definition
@@ -1171,8 +1170,9 @@ class SQLAlchemySource(StatefulIngestionSourceBase):
         wu = SqlWorkUnit(id=dataset_name, mce=mce)
         self.report.report_workunit(wu)
         yield wu
-        dpi_aspect = self.get_dataplatform_instance_aspect(dataset_urn=dataset_urn)
-        if dpi_aspect:
+        if dpi_aspect := self.get_dataplatform_instance_aspect(
+            dataset_urn=dataset_urn
+        ):
             yield dpi_aspect
         subtypes_aspect = MetadataWorkUnit(
             id=f"{view}-subtypes",

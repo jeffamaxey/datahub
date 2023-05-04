@@ -18,46 +18,39 @@ logger = logging.getLogger(__name__)
 
 
 def pretty_field_path(field_path: str) -> str:
-    if field_path.startswith("[version=2.0]"):
+    if not field_path.startswith("[version=2.0]"):
+        return field_path
         # breakpoint()
         # parse schema field
-        tokens = [
-            t
-            for t in field_path.split(".")
-            if not (t.startswith("[") or t.endswith("]"))
-        ]
-        path = ".".join(tokens)
-        return path
-    else:
-        return field_path
+    tokens = [
+        t
+        for t in field_path.split(".")
+        if not t.startswith("[") and not t.endswith("]")
+    ]
+    return ".".join(tokens)
 
 
 def pretty_id(id: Optional[str]) -> str:
     if not id:
         return ""
-    else:
-        # breakpoint()
-        assert id is not None
-        if id.startswith("urn:li:datasetField:") or id.startswith(
+    # breakpoint()
+    assert id is not None
+    if id.startswith("urn:li:datasetField:") or id.startswith(
             "urn:li:schemaField:"
         ):
-            # parse schema field
-            schema_field_key = schema_field_urn_to_key(
-                id.replace("urn:li:datasetField", "urn:li:schemaField")
-            )
-            if schema_field_key:
-                assert schema_field_key is not None
-                field_path = schema_field_key.fieldPath
+        if schema_field_key := schema_field_urn_to_key(
+            id.replace("urn:li:datasetField", "urn:li:schemaField")
+        ):
+            assert schema_field_key is not None
+            field_path = schema_field_key.fieldPath
 
-                return f"{colored('field','cyan')}:{colored(pretty_field_path(field_path),'white')}"
-        if id.startswith("[version=2.0]"):
-            return f"{colored('field','cyan')}:{colored(pretty_field_path(id),'white')}"
+            return f"{colored('field','cyan')}:{colored(pretty_field_path(field_path),'white')}"
+    if id.startswith("[version=2.0]"):
+        return f"{colored('field','cyan')}:{colored(pretty_field_path(id),'white')}"
 
-        if id.startswith("urn:li:dataset"):
-            # parse dataset urn
-            dataset_key = dataset_urn_to_key(id)
-            if dataset_key:
-                return f"{colored('dataset','cyan')}:{colored(dataset_key.platform,'white')}:{colored(dataset_key.name,'white')}"
+    if id.startswith("urn:li:dataset"):
+        if dataset_key := dataset_urn_to_key(id):
+            return f"{colored('dataset','cyan')}:{colored(dataset_key.platform,'white')}:{colored(dataset_key.name,'white')}"
     # failed to prettify, return original
     return id
 
@@ -80,13 +73,10 @@ def get_timeline(
             f"urn {urn} does not seem to be a valid raw (starts with urn:) or encoded urn (starts with urn%3A)"
         )
     categories: str = ",".join([c.upper() for c in category])
-    start_time_param: str = f"&startTime={start_time}" if start_time else ""
     end_time_param: str = f"&endTime={end_time}" if end_time else ""
     diff_param: str = f"&raw={diff}" if diff else ""
-    endpoint: str = (
-        host
-        + f"/openapi/timeline/v1/{encoded_urn}?categories={categories}{start_time_param}{end_time_param}{diff_param}"
-    )
+    start_time_param: str = f"&startTime={start_time}" if start_time else ""
+    endpoint: str = f"{host}/openapi/timeline/v1/{encoded_urn}?categories={categories}{start_time_param}{end_time_param}{diff_param}"
     click.echo(endpoint)
 
     response: Response = session.get(endpoint)
@@ -194,8 +184,7 @@ def timeline(
             )
             change_color = (
                 "green"
-                if change_txn.get("semVerChange") == "MINOR"
-                or change_txn.get("semVerChange") == "PATCH"
+                if change_txn.get("semVerChange") in ["MINOR", "PATCH"]
                 else "red"
             )
             print(

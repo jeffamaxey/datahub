@@ -81,7 +81,7 @@ def test_simple_upstream_table_generation():
         }
     )
     source = BigQuerySource(config=config, ctx=PipelineContext(run_id="test"))
-    source.lineage_metadata = {str(a): set([str(b)])}
+    source.lineage_metadata = {str(a): {str(b)}}
     upstreams = source.get_upstream_tables(str(a), [])
     assert list(upstreams) == [b]
 
@@ -111,9 +111,9 @@ def test_upstream_table_generation_with_temporary_table_without_temp_upstream():
         }
     )
     source = BigQuerySource(config=config, ctx=PipelineContext(run_id="test"))
-    source.lineage_metadata = {str(a): set([str(b)])}
+    source.lineage_metadata = {str(a): {str(b)}}
     upstreams = source.get_upstream_tables(str(a), [])
-    assert list(upstreams) == []
+    assert not list(upstreams)
 
 
 def test_upstream_table_generation_with_temporary_table_with_temp_upstream():
@@ -137,7 +137,7 @@ def test_upstream_table_generation_with_temporary_table_with_temp_upstream():
         }
     )
     source = BigQuerySource(config=config, ctx=PipelineContext(run_id="test"))
-    source.lineage_metadata = {str(a): set([str(b)]), str(b): set([str(c)])}
+    source.lineage_metadata = {str(a): {str(b)}, str(b): {str(c)}}
     upstreams = source.get_upstream_tables(str(a), [])
     assert list(upstreams) == [c]
 
@@ -167,9 +167,9 @@ def test_upstream_table_generation_with_temporary_table_with_multiple_temp_upstr
     )
     source = BigQuerySource(config=config, ctx=PipelineContext(run_id="test"))
     source.lineage_metadata = {
-        str(a): set([str(b)]),
-        str(b): set([str(c), str(d)]),
-        str(d): set([str(e)]),
+        str(a): {str(b)},
+        str(b): {str(c), str(d)},
+        str(d): {str(e)},
     }
     upstreams = source.get_upstream_tables(str(a), [])
     assert list(upstreams).sort() == [c, e].sort()

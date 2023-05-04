@@ -236,24 +236,24 @@ def assert_mce_entity_urn(
 ) -> int:
 
     test_output = load_json_file(file)
-    if isinstance(test_output, list):
-        path_spec = _get_mce_urn_path_spec(entity_type)
-        filter_operator = _get_filter(mce=True)
-        filtered_events = [
-            (x, _element_matches_pattern(x, path_spec, regex_pattern))
-            for x in test_output
-            if filter_operator(x)
-        ]
-        failed_events = [y for y in filtered_events if not y[1][0] or not y[1][1]]
-        if failed_events:
-            raise Exception(
-                "Failed to match events: {json.dumps(failed_events, indent=2)}"
-            )
-        return len(filtered_events)
-    else:
+    if not isinstance(test_output, list):
         raise Exception(
             f"Did not expect the file {file} to not contain a list of items"
         )
+    path_spec = _get_mce_urn_path_spec(entity_type)
+    filter_operator = _get_filter(mce=True)
+    filtered_events = [
+        (x, _element_matches_pattern(x, path_spec, regex_pattern))
+        for x in test_output
+        if filter_operator(x)
+    ]
+    if failed_events := [
+        y for y in filtered_events if not y[1][0] or not y[1][1]
+    ]:
+        raise Exception(
+            "Failed to match events: {json.dumps(failed_events, indent=2)}"
+        )
+    return len(filtered_events)
 
 
 def assert_for_each_entity(
@@ -263,20 +263,16 @@ def assert_for_each_entity(
     test_output = load_json_file(file)
     assert isinstance(test_output, list)
     # mce urns
-    mce_urns = set(
-        [
-            _get_element(x, _get_mce_urn_path_spec(entity_type))
-            for x in test_output
-            if _get_filter(mce=True, entity_type=entity_type)(x)
-        ]
-    )
-    mcp_urns = set(
-        [
-            _get_element(x, _get_mcp_urn_path_spec())
-            for x in test_output
-            if _get_filter(mcp=True, entity_type=entity_type)(x)
-        ]
-    )
+    mce_urns = {
+        _get_element(x, _get_mce_urn_path_spec(entity_type))
+        for x in test_output
+        if _get_filter(mce=True, entity_type=entity_type)(x)
+    }
+    mcp_urns = {
+        _get_element(x, _get_mcp_urn_path_spec())
+        for x in test_output
+        if _get_filter(mcp=True, entity_type=entity_type)(x)
+    }
     all_urns = mce_urns.union(mcp_urns)
     # there should not be any None urns
     assert None not in all_urns

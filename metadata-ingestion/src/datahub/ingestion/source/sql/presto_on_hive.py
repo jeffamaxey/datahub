@@ -169,7 +169,7 @@ class PrestoOnHiveSource(SQLAlchemySource):
         for row in iter_res:
             schema = row["schema"]
             schema_container_key: PlatformKey = self.gen_schema_key(db_name, schema)
-            logger.debug("schema_container_key = {} ".format(schema_container_key))
+            logger.debug(f"schema_container_key = {schema_container_key} ")
             database_container_key = self.gen_database_key(database=db_name)
             container_workunits: Iterable[MetadataWorkUnit] = gen_containers(
                 schema_container_key,
@@ -214,7 +214,7 @@ class PrestoOnHiveSource(SQLAlchemySource):
                 continue
 
             columns = list(group)
-            if len(columns) == 0:
+            if not columns:
                 self.report.report_warning(dataset_name, "missing column information")
 
             dataset_urn: str = make_dataset_urn_with_platform_instance(
@@ -273,8 +273,9 @@ class PrestoOnHiveSource(SQLAlchemySource):
             self.report.report_workunit(wu)
             yield wu
 
-            dpi_aspect = self.get_dataplatform_instance_aspect(dataset_urn=dataset_urn)
-            if dpi_aspect:
+            if dpi_aspect := self.get_dataplatform_instance_aspect(
+                dataset_urn=dataset_urn
+            ):
                 yield dpi_aspect
 
             yield from self._get_domain_wu(
@@ -371,8 +372,9 @@ class PrestoOnHiveSource(SQLAlchemySource):
             self.report.report_workunit(wu)
             yield wu
 
-            dpi_aspect = self.get_dataplatform_instance_aspect(dataset_urn=dataset_urn)
-            if dpi_aspect:
+            if dpi_aspect := self.get_dataplatform_instance_aspect(
+                dataset_urn=dataset_urn
+            ):
                 yield dpi_aspect
 
             yield from self._get_domain_wu(
@@ -430,8 +432,7 @@ class SQLAlchemyClient:
     def _get_connection(self) -> Any:
         url = self.config.get_sql_alchemy_url()
         engine = create_engine(url, **self.config.options)
-        conn = engine.connect()
-        return conn
+        return engine.connect()
 
     def execute_query(self, query: str) -> Iterable:
         """

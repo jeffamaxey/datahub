@@ -412,8 +412,7 @@ class RedshiftSource(SQLAlchemySource):
         engine = self.get_metadata_engine()
         with engine.connect() as conn:
             self.get_catalog_metadata(conn)
-            inspector = inspect(conn)
-            yield inspector
+            yield inspect(conn)
 
     def get_metadata_engine(self) -> sqlalchemy.engine.Engine:
         url = self.config.get_sql_alchemy_url()
@@ -519,18 +518,14 @@ class RedshiftSource(SQLAlchemySource):
 
         """
         db_name = self.get_db_name()
-        all_tables_set = set()
-
         engine = self.get_metadata_engine()
-        for db_row in engine.execute(all_tables_query):
-            all_tables_set.add(
-                f'{db_name}.{db_row["schemaname"]}.{db_row["tablename"]}'
-            )
-
-        return all_tables_set
+        return {
+            f'{db_name}.{db_row["schemaname"]}.{db_row["tablename"]}'
+            for db_row in engine.execute(all_tables_query)
+        }
 
     def _get_sources_from_query(self, db_name: str, query: str) -> List[LineageDataset]:
-        sources = list()
+        sources = []
 
         parser = LineageRunner(query)
 
@@ -549,8 +544,7 @@ class RedshiftSource(SQLAlchemySource):
 
     def get_db_name(self, inspector: Inspector = None) -> str:
         db_name = getattr(self.config, "database")
-        db_alias = getattr(self.config, "database_alias")
-        if db_alias:
+        if db_alias := getattr(self.config, "database_alias"):
             db_name = db_alias
         return db_name
 
@@ -597,10 +591,10 @@ class RedshiftSource(SQLAlchemySource):
                     ),
                     upstreams=set(),
                     collector_type=lineage_type,
-                    query_parser_failed_sqls=list(),
+                    query_parser_failed_sqls=[],
                 )
 
-                sources: List[LineageDataset] = list()
+                sources: List[LineageDataset] = []
                 # Source
                 if lineage_type in [
                     lineage_type.QUERY_SQL_PARSER,
@@ -739,64 +733,6 @@ class RedshiftSource(SQLAlchemySource):
             start_time=self.config.start_time.strftime(redshift_datetime_format),
             end_time=self.config.end_time.strftime(redshift_datetime_format),
         )
-        view_lineage_query = """
-            select
-                distinct
-                srcnsp.nspname as source_schema
-                ,
-                srcobj.relname as source_table
-                ,
-                tgtnsp.nspname as target_schema
-                ,
-                tgtobj.relname as target_table
-            from
-                pg_catalog.pg_class as srcobj
-            inner join
-                pg_catalog.pg_depend as srcdep
-                    on
-                srcobj.oid = srcdep.refobjid
-            inner join
-                pg_catalog.pg_depend as tgtdep
-                    on
-                srcdep.objid = tgtdep.objid
-            join
-                pg_catalog.pg_class as tgtobj
-                    on
-                tgtdep.refobjid = tgtobj.oid
-                and srcobj.oid <> tgtobj.oid
-            left outer join
-                pg_catalog.pg_namespace as srcnsp
-                    on
-                srcobj.relnamespace = srcnsp.oid
-            left outer join
-                pg_catalog.pg_namespace tgtnsp
-                    on
-                tgtobj.relnamespace = tgtnsp.oid
-            where
-                tgtdep.deptype = 'i'
-                --dependency_internal
-                and tgtobj.relkind = 'v'
-                --i=index, v=view, s=sequence
-                and tgtnsp.nspname not in ('pg_catalog', 'information_schema')
-                order by target_schema, target_table asc
-        """
-
-        list_late_binding_views_query = """
-        SELECT
-            n.nspname AS target_schema
-            ,c.relname AS target_table
-            , COALESCE(pg_get_viewdef(c.oid, TRUE), '') AS ddl
-        FROM
-            pg_catalog.pg_class AS c
-        INNER JOIN
-            pg_catalog.pg_namespace AS n
-            ON c.relnamespace = n.oid
-        WHERE relkind = 'v'
-        and ddl like '%%with no schema binding%%'
-        and
-        n.nspname not in ('pg_catalog', 'information_schema')
-        """
-
         list_insert_create_queries_sql = """
         select
             distinct cluster,
@@ -892,10 +828,68 @@ class RedshiftSource(SQLAlchemySource):
             )
 
         if self.config.include_views:
+            view_lineage_query = """
+            select
+                distinct
+                srcnsp.nspname as source_schema
+                ,
+                srcobj.relname as source_table
+                ,
+                tgtnsp.nspname as target_schema
+                ,
+                tgtobj.relname as target_table
+            from
+                pg_catalog.pg_class as srcobj
+            inner join
+                pg_catalog.pg_depend as srcdep
+                    on
+                srcobj.oid = srcdep.refobjid
+            inner join
+                pg_catalog.pg_depend as tgtdep
+                    on
+                srcdep.objid = tgtdep.objid
+            join
+                pg_catalog.pg_class as tgtobj
+                    on
+                tgtdep.refobjid = tgtobj.oid
+                and srcobj.oid <> tgtobj.oid
+            left outer join
+                pg_catalog.pg_namespace as srcnsp
+                    on
+                srcobj.relnamespace = srcnsp.oid
+            left outer join
+                pg_catalog.pg_namespace tgtnsp
+                    on
+                tgtobj.relnamespace = tgtnsp.oid
+            where
+                tgtdep.deptype = 'i'
+                --dependency_internal
+                and tgtobj.relkind = 'v'
+                --i=index, v=view, s=sequence
+                and tgtnsp.nspname not in ('pg_catalog', 'information_schema')
+                order by target_schema, target_table asc
+        """
+
             # Populate table level lineage for views
             self._populate_lineage_map(
                 query=view_lineage_query, lineage_type=LineageCollectorType.VIEW
             )
+
+            list_late_binding_views_query = """
+        SELECT
+            n.nspname AS target_schema
+            ,c.relname AS target_table
+            , COALESCE(pg_get_viewdef(c.oid, TRUE), '') AS ddl
+        FROM
+            pg_catalog.pg_class AS c
+        INNER JOIN
+            pg_catalog.pg_namespace AS n
+            ON c.relnamespace = n.oid
+        WHERE relkind = 'v'
+        and ddl like '%%with no schema binding%%'
+        and
+        n.nspname not in ('pg_catalog', 'information_schema')
+        """
 
             # Populate table level lineage for late binding views
             self._populate_lineage_map(
@@ -953,29 +947,31 @@ class RedshiftSource(SQLAlchemySource):
         db_name = dataset_params[0]
         schemaname = dataset_params[1]
         tablename = dataset_params[2]
-        if db_name in self.catalog_metadata:
-            if schemaname in self.catalog_metadata[db_name]:
-                external_db_params = self.catalog_metadata[db_name][schemaname]
-                upstream_platform = self.eskind_to_platform[
-                    external_db_params["eskind"]
-                ]
-                catalog_upstream = UpstreamClass(
-                    mce_builder.make_dataset_urn_with_platform_instance(
-                        upstream_platform,
-                        "{database}.{table}".format(
-                            database=external_db_params["external_database"],
-                            table=tablename,
-                        ),
-                        platform_instance=self.config.platform_instance_map.get(
-                            upstream_platform
-                        )
-                        if self.config.platform_instance_map
-                        else None,
-                        env=self.config.env,
+        if (
+            db_name in self.catalog_metadata
+            and schemaname in self.catalog_metadata[db_name]
+        ):
+            external_db_params = self.catalog_metadata[db_name][schemaname]
+            upstream_platform = self.eskind_to_platform[
+                external_db_params["eskind"]
+            ]
+            catalog_upstream = UpstreamClass(
+                mce_builder.make_dataset_urn_with_platform_instance(
+                    upstream_platform,
+                    "{database}.{table}".format(
+                        database=external_db_params["external_database"],
+                        table=tablename,
                     ),
-                    DatasetLineageTypeClass.COPY,
-                )
-                upstream_lineage.append(catalog_upstream)
+                    platform_instance=self.config.platform_instance_map.get(
+                        upstream_platform
+                    )
+                    if self.config.platform_instance_map
+                    else None,
+                    env=self.config.env,
+                ),
+                DatasetLineageTypeClass.COPY,
+            )
+            upstream_lineage.append(catalog_upstream)
 
         properties = None
         if custom_properties:

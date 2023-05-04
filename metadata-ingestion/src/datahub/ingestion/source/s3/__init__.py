@@ -118,13 +118,14 @@ def get_column_type(
     """
     Maps known Spark types to datahub types
     """
-    TypeClass: Any = None
-
-    for field_type, type_class in _field_type_mapping.items():
-        if isinstance(column_type, field_type):
-            TypeClass = type_class
-            break
-
+    TypeClass: Any = next(
+        (
+            type_class
+            for field_type, type_class in _field_type_mapping.items()
+            if isinstance(column_type, field_type)
+        ),
+        None,
+    )
     # if still not found, report the warning
     if TypeClass is None:
         report.report_warning(
@@ -382,7 +383,7 @@ class S3Source(Source):
                     prefix = parent_key.bucket_name
                 elif isinstance(parent_key, FolderKey):
                     prefix = parent_key.folder_abs_path
-                abs_path = prefix + "/" + folder
+                abs_path = f"{prefix}/{folder}"
             folder_key = self.gen_folder_key(abs_path)
             yield from self.create_emit_containers(
                 container_key=folder_key,
@@ -588,8 +589,7 @@ class S3Source(Source):
         )
 
     def get_prefix(self, relative_path: str) -> str:
-        index = re.search("[\*|\{]", relative_path)  # noqa: W605
-        if index:
+        if index := re.search("[\*|\{]", relative_path):
             return relative_path[: index.start()]
         else:
             return relative_path
@@ -605,7 +605,7 @@ class S3Source(Source):
         parsed_vars = self.source_config.path_spec.get_named_vars(path)
         table_data = None
         if parsed_vars is None or "table" not in parsed_vars.named:
-            table_data = TableData(
+            return TableData(
                 disaply_name=os.path.basename(path),
                 is_s3=self.source_config.path_spec.is_s3(),
                 full_path=path,
@@ -613,21 +613,19 @@ class S3Source(Source):
                 timestamp=timestamp,
                 table_path=path,
             )
-        else:
-            include = self.source_config.path_spec.include
-            depth = include.count("/", 0, include.find("{table}"))
-            table_path = (
-                "/".join(path.split("/")[:depth]) + "/" + parsed_vars.named["table"]
-            )
-            table_data = TableData(
-                disaply_name=self.extract_table_name(parsed_vars.named),
-                is_s3=self.source_config.path_spec.is_s3(),
-                full_path=path,
-                partitions=None,
-                timestamp=timestamp,
-                table_path=table_path,
-            )
-        return table_data
+        include = self.source_config.path_spec.include
+        depth = include.count("/", 0, include.find("{table}"))
+        table_path = (
+            "/".join(path.split("/")[:depth]) + "/" + parsed_vars.named["table"]
+        )
+        return TableData(
+            disaply_name=self.extract_table_name(parsed_vars.named),
+            is_s3=self.source_config.path_spec.is_s3(),
+            full_path=path,
+            partitions=None,
+            timestamp=timestamp,
+            table_path=table_path,
+        )
 
     def s3_browser(self) -> Iterable[tuple]:
         if self.source_config.aws_config is None:
@@ -673,7 +671,7 @@ class S3Source(Source):
                 d_table_data = table_dict.setdefault(table_data.table_path, table_data)
                 if d_table_data.timestamp < table_data.timestamp:
                     table_dict[table_data.table_path] = table_data
-            for guid, table_data in table_dict.items():
+            for table_data in table_dict.values():
                 yield from self.ingest_table(table_data)
 
             if not self.source_config.profiling.enabled:

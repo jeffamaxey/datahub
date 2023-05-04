@@ -229,9 +229,9 @@ class OktaSource(Source):
         # Note that this is not taking full advantage of Python AsyncIO, as we are blocking on calls.
         query_parameters: Dict[str, Union[str, int]] = {"limit": self.config.page_size}
         if self.config.okta_groups_filter:
-            query_parameters.update({"filter": self.config.okta_groups_filter})
+            query_parameters["filter"] = self.config.okta_groups_filter
         if self.config.okta_groups_search:
-            query_parameters.update({"search": self.config.okta_groups_search})
+            query_parameters["search"] = self.config.okta_groups_search
         groups = resp = err = None
         try:
             groups, resp, err = event_loop.run_until_complete(
@@ -247,8 +247,7 @@ class OktaSource(Source):
                     "okta_groups", f"Failed to fetch Groups from Okta API: {err}"
                 )
             if groups:
-                for group in groups:
-                    yield group
+                yield from groups
             if resp and resp.has_next():
                 sleep(self.config.delay_seconds)
                 try:
@@ -286,8 +285,7 @@ class OktaSource(Source):
                     f"Failed to fetch Users of Group {group.profile.name} from Okta API: {err}",
                 )
             if users:
-                for user in users:
-                    yield user
+                yield from users
             if resp and resp.has_next():
                 sleep(self.config.delay_seconds)
                 try:
@@ -306,9 +304,9 @@ class OktaSource(Source):
 
         query_parameters: Dict[str, Union[str, int]] = {"limit": self.config.page_size}
         if self.config.okta_users_filter:
-            query_parameters.update({"filter": self.config.okta_users_filter})
+            query_parameters["filter"] = self.config.okta_users_filter
         if self.config.okta_users_search:
-            query_parameters.update({"search": self.config.okta_users_search})
+            query_parameters["search"] = self.config.okta_users_search
         users = resp = err = None
         try:
             users, resp, err = event_loop.run_until_complete(
@@ -324,8 +322,7 @@ class OktaSource(Source):
                     "okta_users", f"Failed to fetch Users from Okta API: {err}"
                 )
             if users:
-                for user in users:
-                    yield user
+                yield from users
             if resp and resp.has_next():
                 sleep(self.config.delay_seconds)
                 try:
@@ -427,9 +424,7 @@ class OktaSource(Source):
     ) -> Union[str, None]:
         # Profile is a required field as per https://developer.okta.com/docs/reference/api/users/#user-attributes
         username = self._map_okta_user_profile_to_username(okta_user_profile)
-        if username is None:
-            return None
-        return self._make_corp_user_urn(username)
+        return None if username is None else self._make_corp_user_urn(username)
 
     # Converts Okta User Profile Object into a DataHub User name.
     def _map_okta_user_profile_to_username(
@@ -474,6 +469,4 @@ class OktaSource(Source):
         if raw_value is None:
             return None
         match = re.search(pattern, raw_value)
-        if match is None:
-            return None
-        return match.group()
+        return None if match is None else match.group()

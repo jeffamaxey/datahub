@@ -91,7 +91,7 @@ class SqlLineageSQLParserImpl:
                 self._sql_holder = SQLLineageHolder.of(*self._stmt_holders)
 
     def get_tables(self) -> List[str]:
-        result: List[str] = list()
+        result: List[str] = []
         for table in self._sql_holder.source_tables:
             table_normalized = re.sub(r"^<default>.", "", str(table))
             result.append(str(table_normalized))
@@ -118,19 +118,16 @@ class SqlLineageSQLParserImpl:
 
         target_columns = {column for column, deg in column_graph.out_degree if deg == 0}
 
-        result: Set[str] = set()
-        for column in target_columns:
-            # Let's drop all the count(*) and similard columns which are expression actually if it does not have an alias
-            if not any(ele in column.raw_name for ele in ["*", "(", ")"]):
-                result.add(str(column.raw_name))
-
+        result: Set[str] = {
+            str(column.raw_name)
+            for column in target_columns
+            if all(ele not in column.raw_name for ele in ["*", "(", ")"])
+        }
         # Reverting back all the previously renamed words which confuses the parser
-        result = set(["date" if c == self._DATE_SWAP_TOKEN else c for c in result])
-        result = set(
-            [
-                "timestamp" if c == self._TIMESTAMP_SWAP_TOKEN else c
-                for c in list(result)
-            ]
-        )
+        result = {"date" if c == self._DATE_SWAP_TOKEN else c for c in result}
+        result = {
+            "timestamp" if c == self._TIMESTAMP_SWAP_TOKEN else c
+            for c in list(result)
+        }
         # swap back renamed date column
         return list(result)

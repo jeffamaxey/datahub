@@ -52,9 +52,9 @@ class LookerDashboardElement:
 
 		# A dashboard element can use a look or just a raw query against an explore
 		if self.look_id is not None:
-			return base_url + "/looks/" + self.look_id
+			return f"{base_url}/looks/{self.look_id}"
 		else:
-			return base_url + "/x/" + self.query_slug
+			return f"{base_url}/x/{self.query_slug}"
 
 	def get_urn_element_id(self):
 		# A dashboard element can use a look or just a raw query against an explore
@@ -73,7 +73,7 @@ class LookerDashboard:
 
 	@property
 	def url(self):
-		return get_looker_base_url() + "/dashboards/" + self.id
+		return f"{get_looker_base_url()}/dashboards/{self.id}"
 
 	def get_urn_dashboard_id(self):
 		return f"dashboards.{self.id}"
@@ -89,8 +89,7 @@ class DashboardKafkaEvents:
 
 
 def get_looker_base_url():
-	base_url = LOOKERSDK_BASE_URL.split("looker.com")[0] + "looker.com"
-	return base_url
+	return LOOKERSDK_BASE_URL.split("looker.com")[0] + "looker.com"
 
 
 def get_actor_and_sys_time():
@@ -285,9 +284,9 @@ def delivery_report(err, msg):
 	""" Called once for each message produced to indicate delivery result.
 		Triggered by poll() or flush(). """
 	if err is not None:
-		print('Message delivery failed: {}'.format(err))
+		print(f'Message delivery failed: {err}')
 	else:
-		print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+		print(f'Message delivered to {msg.topic()} [{msg.partition()}]')
 
 
 def make_kafka_producer(extra_kafka_conf):
@@ -298,14 +297,14 @@ def make_kafka_producer(extra_kafka_conf):
 
 	key_schema = avro.loads('{"type": "string"}')
 	record_schema = avro.load(AVSC_PATH)
-	producer = AvroProducer(conf, default_key_schema=key_schema, default_value_schema=record_schema)
-	return producer
+	return AvroProducer(
+		conf, default_key_schema=key_schema, default_value_schema=record_schema
+	)
 
 
 def _extract_view_from_field(field: str) -> str:
 	assert field.count(".") == 1, f"Error: A field must be prefixed by a view name, field is: {field}"
-	view_name = field.split(".")[0]
-	return view_name
+	return field.split(".")[0]
 
 
 def get_views_from_query(query: Query) -> typing.List[str]:
@@ -340,7 +339,7 @@ def get_views_from_query(query: Query) -> typing.List[str]:
 	fields: typing.Sequence[str] = query.fields if query.fields is not None else []
 	for field in fields:
 		# If the field is a custom field, look up the field it is based on
-		field_name = custom_field_to_underlying_field[field] if field in custom_field_to_underlying_field else field
+		field_name = custom_field_to_underlying_field.get(field, field)
 		if field_name is None:
 			continue
 		view_name = _extract_view_from_field(field_name)
@@ -350,7 +349,7 @@ def get_views_from_query(query: Query) -> typing.List[str]:
 	filters: typing.MutableMapping[str, typing.Any] = query.filters if query.filters is not None else {}
 	for field in filters.keys():
 		# If the field is a custom field, look up the field it is based on
-		field_name = custom_field_to_underlying_field[field] if field in custom_field_to_underlying_field else field
+		field_name = custom_field_to_underlying_field.get(field, field)
 		if field_name is None:
 			continue
 		view_name = _extract_view_from_field(field_name)
@@ -386,8 +385,12 @@ def get_looker_dashboard(dashboard: Dashboard) -> LookerDashboard:
 		if looker_dashboard_element is not None:
 			dashboard_elements.append(looker_dashboard_element)
 
-	looker_dashboard = LookerDashboard(id=dashboard.id, title=dashboard.title, description=dashboard.description, dashboard_elements=dashboard_elements)
-	return looker_dashboard
+	return LookerDashboard(
+		id=dashboard.id,
+		title=dashboard.title,
+		description=dashboard.description,
+		dashboard_elements=dashboard_elements,
+	)
 
 
 # Perform IO in main

@@ -99,13 +99,14 @@ def get_column_type(
     """
     Maps known Spark types to datahub types
     """
-    TypeClass: Any = None
-
-    for field_type, type_class in _field_type_mapping.items():
-        if isinstance(column_type, field_type):
-            TypeClass = type_class
-            break
-
+    TypeClass: Any = next(
+        (
+            type_class
+            for field_type, type_class in _field_type_mapping.items()
+            if isinstance(column_type, field_type)
+        ),
+        None,
+    )
     # if still not found, report the warning
     if TypeClass is None:
 
@@ -519,7 +520,7 @@ class DataLakeSource(Source):
 
         # append a trailing slash if it's not there so prefix filtering works
         if not plain_base_path.endswith("/"):
-            plain_base_path = plain_base_path + "/"
+            plain_base_path = f"{plain_base_path}/"
 
         if self.source_config.aws_config is None:
             raise ValueError("AWS config is required for S3 file sources")
@@ -566,7 +567,7 @@ class DataLakeSource(Source):
         for aws_file in sorted(base_obj_paths, key=lambda a: a[0]):
             path = aws_file[0]
             properties = aws_file[1]
-            relative_path = "./" + path[len(plain_base_path) :]
+            relative_path = f"./{path[len(plain_base_path):]}"
 
             # pass in the same relative_path as the full_path for S3 files
             yield from self.ingest_table(
@@ -582,9 +583,7 @@ class DataLakeSource(Source):
 
                 full_path = os.path.join(root, file)
 
-                relative_path = "./" + os.path.relpath(
-                    full_path, self.source_config.base_path
-                )
+                relative_path = f"./{os.path.relpath(full_path, self.source_config.base_path)}"
 
                 # if table patterns do not allow this file, skip
                 if not self.source_config.schema_patterns.allowed(full_path):

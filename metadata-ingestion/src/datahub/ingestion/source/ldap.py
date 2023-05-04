@@ -53,9 +53,7 @@ def guess_person_ldap(attrs: Dict[str, Any]) -> Optional[str]:
     """Determine the user's LDAP based on the DN and attributes."""
     if "sAMAccountName" in attrs:
         return attrs["sAMAccountName"][0].decode()
-    if "uid" in attrs:
-        return attrs["uid"][0].decode()
-    return None
+    return attrs["uid"][0].decode() if "uid" in attrs else None
 
 
 class LDAPSourceConfig(ConfigModel):
@@ -131,9 +129,7 @@ class LDAPSource(Source):
                 )
                 _rtype, rdata, _rmsgid, serverctrls = self.ldap_client.result3(msgid)
             except ldap.LDAPError as e:
-                self.report.report_failure(
-                    "ldap-control", "LDAP search failed: {}".format(e)
-                )
+                self.report.report_failure("ldap-control", f"LDAP search failed: {e}")
                 break
 
             for dn, attrs in rdata:
@@ -189,12 +185,9 @@ class LDAPSource(Source):
                 _m_dn, m_attrs = self.ldap_client.result3(manager_msgid)[1][0]
                 manager_ldap = guess_person_ldap(m_attrs)
             except ldap.LDAPError as e:
-                self.report.report_warning(
-                    dn, "manager LDAP search failed: {}".format(e)
-                )
+                self.report.report_warning(dn, f"manager LDAP search failed: {e}")
 
-        mce = self.build_corp_user_mce(dn, attrs, manager_ldap)
-        if mce:
+        if mce := self.build_corp_user_mce(dn, attrs, manager_ldap):
             wu = MetadataWorkUnit(dn, mce)
             self.report.report_workunit(wu)
             yield wu
@@ -206,8 +199,7 @@ class LDAPSource(Source):
     ) -> Iterable[MetadataWorkUnit]:
         """Creates a workunit for LDAP groups."""
 
-        mce = self.build_corp_group_mce(attrs)
-        if mce:
+        if mce := self.build_corp_group_mce(attrs):
             wu = MetadataWorkUnit(dn, mce)
             self.report.report_workunit(wu)
             yield wu
@@ -263,8 +255,7 @@ class LDAPSource(Source):
 
     def build_corp_group_mce(self, attrs: dict) -> Optional[MetadataChangeEvent]:
         """Creates a MetadataChangeEvent for LDAP groups."""
-        cn = attrs.get("cn")
-        if cn:
+        if cn := attrs.get("cn"):
             full_name = cn[0].decode()
             owners = parse_from_attrs(attrs, "owner")
             members = parse_from_attrs(attrs, "uniqueMember")

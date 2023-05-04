@@ -179,21 +179,20 @@ class _SingleTableProfiler:
             # Normal CountDistinct is ridiculously slow
             self.analyzer.addAnalyzer(ApproxCountDistinct(column))
 
-        if self.profiling_config.max_number_of_fields_to_profile is not None:
-            if (
-                len(self.columns_to_profile)
-                > self.profiling_config.max_number_of_fields_to_profile
-            ):
-                columns_being_dropped = self.columns_to_profile[
-                    self.profiling_config.max_number_of_fields_to_profile :
-                ]
-                self.columns_to_profile = self.columns_to_profile[
-                    : self.profiling_config.max_number_of_fields_to_profile
-                ]
+        if self.profiling_config.max_number_of_fields_to_profile is not None and (
+            len(self.columns_to_profile)
+            > self.profiling_config.max_number_of_fields_to_profile
+        ):
+            columns_being_dropped = self.columns_to_profile[
+                self.profiling_config.max_number_of_fields_to_profile :
+            ]
+            self.columns_to_profile = self.columns_to_profile[
+                : self.profiling_config.max_number_of_fields_to_profile
+            ]
 
-                self.report.report_file_dropped(
-                    f"The max_number_of_fields_to_profile={self.profiling_config.max_number_of_fields_to_profile} reached. Profile of columns {self.file_path}({', '.join(sorted(columns_being_dropped))})"
-                )
+            self.report.report_file_dropped(
+                f"The max_number_of_fields_to_profile={self.profiling_config.max_number_of_fields_to_profile} reached. Profile of columns {self.file_path}({', '.join(sorted(columns_being_dropped))})"
+            )
 
         analysis_result = self.analyzer.run()
         analysis_metrics = AnalyzerContext.successMetricsAsJson(
@@ -380,9 +379,6 @@ class _SingleTableProfiler:
                     self.prep_stdev_value(column)
                     self.prep_quantiles(column)
                     self.prep_field_histogram(column)
-                else:  # unknown cardinality - skip
-                    pass
-
             elif isinstance(type_, StringType):
                 if cardinality in [
                     Cardinality.ONE,

@@ -69,7 +69,7 @@ class KafkaSourceTest(unittest.TestCase):
             },
             ctx,
         )
-        workunits = [w for w in kafka_source.get_workunits()]
+        workunits = list(kafka_source.get_workunits())
 
         mock_kafka.assert_called_once()
         mock_kafka_instance.list_topics.assert_called_once()
@@ -84,7 +84,7 @@ class KafkaSourceTest(unittest.TestCase):
             },
             ctx,
         )
-        workunits = [w for w in kafka_source.get_workunits()]
+        workunits = list(kafka_source.get_workunits())
         assert len(workunits) == 4
 
     @patch("datahub.ingestion.source.kafka.confluent_kafka.Consumer", autospec=True)
@@ -107,7 +107,7 @@ class KafkaSourceTest(unittest.TestCase):
             },
             ctx,
         )
-        workunits = [w for w in kafka_source.get_workunits()]
+        workunits = list(kafka_source.get_workunits())
 
         # We should only have 1 topic + sub-type wu.
         assert len(workunits) == 2

@@ -401,21 +401,27 @@ def make_table_urn(
     # https://github.com/datahub-project/datahub/blob/master/metadata-service/war/src/main/resources/boot/data_platforms.json
 
     final_name = full_name.replace("[", "").replace("]", "")
-    if connection_type in ("textscan", "textclean", "excel-direct", "excel", "csv"):
+    if connection_type in {
+        "textscan",
+        "textclean",
+        "excel-direct",
+        "excel",
+        "csv",
+    }:
         platform = "external"
-    elif connection_type in (
+    elif connection_type in {
         "hadoophive",
         "hive",
         "hortonworkshadoophive",
         "maprhadoophive",
         "awshadoophive",
-    ):
+    }:
         platform = "hive"
-    elif connection_type in ("mysql_odbc", "mysql"):
+    elif connection_type in {"mysql_odbc", "mysql"}:
         platform = "mysql"
-    elif connection_type in ("webdata-direct:oracle-eloqua", "oracle"):
+    elif connection_type in {"webdata-direct:oracle-eloqua", "oracle"}:
         platform = "oracle"
-    elif connection_type in ("tbio", "teradata"):
+    elif connection_type in {"tbio", "teradata"}:
         platform = "teradata"
     elif connection_type in ("sqlserver"):
         platform = "mssql"
@@ -437,8 +443,7 @@ def make_table_urn(
     # if there are more than 3 tokens, just take the final 3
     fully_qualified_table_name = ".".join(fully_qualified_table_name.split(".")[-3:])
 
-    urn = builder.make_dataset_urn(platform, fully_qualified_table_name, env)
-    return urn
+    return builder.make_dataset_urn(platform, fully_qualified_table_name, env)
 
 
 def make_description_from_params(description, formula):
@@ -457,8 +462,7 @@ def get_field_value_in_sheet(field, field_name):
     if field.get("__typename", "") == "DatasourceField":
         field = field.get("remoteField") if field.get("remoteField") else {}
 
-    field_value = field.get(field_name, "")
-    return field_value
+    return field.get(field_name, "")
 
 
 def get_unique_custom_sql(custom_sql_list: List[dict]) -> List[dict]:
@@ -510,6 +514,4 @@ def query_metadata(server, main_query, connection_name, first, offset, qry_filte
         filter=qry_filter,
         main_query=main_query,
     )
-    query_result = server.metadata.query(query)
-
-    return query_result
+    return server.metadata.query(query)

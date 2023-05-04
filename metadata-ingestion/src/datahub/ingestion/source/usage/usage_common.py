@@ -139,13 +139,13 @@ class BaseUsageConfig(BaseTimeWindowConfig):
     def ensure_top_n_queries_is_not_too_big(cls, v: int) -> int:
         minimum_query_size = 20
 
-        max_queries = int(
-            GenericAggregatedDataset.total_budget_for_query_list / minimum_query_size
-        )
         if (
             int(GenericAggregatedDataset.total_budget_for_query_list / v)
             < minimum_query_size
         ):
+            max_queries = int(
+                GenericAggregatedDataset.total_budget_for_query_list / minimum_query_size
+            )
             raise ValueError(
                 f"top_n_queries is set to {v} but it can be maximum {max_queries}"
             )

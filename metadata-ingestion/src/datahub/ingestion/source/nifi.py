@@ -253,8 +253,7 @@ class NifiFlow:
 
 
 def get_attribute_value(attr_lst: List[dict], attr_name: str) -> Optional[str]:
-    match = [entry for entry in attr_lst if entry["name"] == attr_name]
-    if len(match) > 0:
+    if match := [entry for entry in attr_lst if entry["name"] == attr_name]:
         return match[0]["value"]
     return None
 
@@ -284,8 +283,8 @@ class NifiSource(Source):
         if self.config.site_url_to_site_name is None:
             self.config.site_url_to_site_name = {}
         if (
-            not urljoin(self.config.site_url, "/nifi/")
-            in self.config.site_url_to_site_name
+            urljoin(self.config.site_url, "/nifi/")
+            not in self.config.site_url_to_site_name
         ):
             self.config.site_url_to_site_name[
                 urljoin(self.config.site_url, "/nifi/")
@@ -324,8 +323,7 @@ class NifiSource(Source):
 
             self.session.headers.update(
                 {
-                    "Authorization": "Bearer " + token_response.text,
-                    # "Accept": "application/json",
+                    "Authorization": f"Bearer {token_response.text}",
                     "Content-Type": "application/json",
                 }
             )
@@ -578,7 +576,7 @@ class NifiSource(Source):
         else:
             logger.warn("Failed to fetch cluster summary for flow")
         pg_response = self.session.get(
-            url=urljoin(self.config.site_url, PG_ENDPOINT) + "root"
+            url=f"{urljoin(self.config.site_url, PG_ENDPOINT)}root"
         )
 
         if not pg_response.ok:
@@ -720,7 +718,7 @@ class NifiSource(Source):
         rootpg = self.nifi_flow.root_process_group
         flow_name = rootpg.name  # self.config.site_name
         flow_urn = builder.make_data_flow_urn(NIFI, rootpg.id, self.config.env)
-        flow_properties = dict()
+        flow_properties = {}
         if self.nifi_flow.clustered is not None:
             flow_properties["clustered"] = str(self.nifi_flow.clustered)
         if self.nifi_flow.version is not None:
@@ -856,9 +854,11 @@ class NifiSource(Source):
                 job_urn,
                 job_name,
                 external_url=self.make_external_url(
-                    component.parent_group_id, component.id, component.parent_rpg_id
+                    component.parent_group_id,
+                    component.id,
+                    component.parent_rpg_id,
                 ),
-                job_type=NIFI.upper() + "_" + component.nifi_type.value,
+                job_type=f"{NIFI.upper()}_{component.nifi_type.value}",
                 description=component.comments,
                 job_properties=jobProperties,
                 inlets=list(component.inlets.keys()),

@@ -47,49 +47,46 @@ class OpenApiConfig(ConfigModel):
     get_token: dict = {}
 
     def get_swagger(self) -> Dict:
-        if self.get_token or self.token is not None:
-            if self.token is not None:
-                ...
-            else:
-                assert (
-                    "url_complement" in self.get_token.keys()
-                ), "When 'request_type' is set to 'get', an url_complement is needed for the request."
-                if self.get_token["request_type"] == "get":
-                    assert (
-                        "{username}" in self.get_token["url_complement"]
-                    ), "we expect the keyword {username} to be present in the url"
-                    assert (
-                        "{password}" in self.get_token["url_complement"]
-                    ), "we expect the keyword {password} to be present in the url"
-                    url4req = self.get_token["url_complement"].replace(
-                        "{username}", self.username
-                    )
-                    url4req = url4req.replace("{password}", self.password)
-                elif self.get_token["request_type"] == "post":
-                    url4req = self.get_token["url_complement"]
-                else:
-                    raise KeyError(
-                        "This tool accepts only 'get' and 'post' as method for getting tokens"
-                    )
-                self.token = get_tok(
-                    url=self.url,
-                    username=self.username,
-                    password=self.password,
-                    tok_url=url4req,
-                    method=self.get_token["request_type"],
-                )
-            sw_dict = get_swag_json(
-                self.url, token=self.token, swagger_file=self.swagger_file
-            )  # load the swagger file
-
-        else:  # using basic auth for accessing endpoints
-            sw_dict = get_swag_json(
+        if not self.get_token and self.token is None:
+            return get_swag_json(
                 self.url,
                 username=self.username,
                 password=self.password,
                 swagger_file=self.swagger_file,
             )
-        return sw_dict
+        if self.token is not None:
+            ...
+        else:
+            assert (
+                "url_complement" in self.get_token.keys()
+            ), "When 'request_type' is set to 'get', an url_complement is needed for the request."
+            if self.get_token["request_type"] == "get":
+                assert (
+                    "{username}" in self.get_token["url_complement"]
+                ), "we expect the keyword {username} to be present in the url"
+                assert (
+                    "{password}" in self.get_token["url_complement"]
+                ), "we expect the keyword {password} to be present in the url"
+                url4req = self.get_token["url_complement"].replace(
+                    "{username}", self.username
+                )
+                url4req = url4req.replace("{password}", self.password)
+            elif self.get_token["request_type"] == "post":
+                url4req = self.get_token["url_complement"]
+            else:
+                raise KeyError(
+                    "This tool accepts only 'get' and 'post' as method for getting tokens"
+                )
+            self.token = get_tok(
+                url=self.url,
+                username=self.username,
+                password=self.password,
+                tok_url=url4req,
+                method=self.get_token["request_type"],
+            )
+        return get_swag_json(
+            self.url, token=self.token, swagger_file=self.swagger_file
+        )
 
 
 # class ParserWarning(UserWarning):
@@ -246,47 +243,29 @@ class APISource(Source, ABC):
                     # start guessing...
                     url_guess = try_guessing(endpoint_k, root_dataset_samples)
                     tot_url = clean_url(config.url + self.url_basepath + url_guess)
-                    if config.token:
-                        response = request_call(tot_url, token=config.token)
-                    else:
-                        response = request_call(
-                            tot_url, username=config.username, password=config.password
-                        )
-                    if response.status_code == 200:
-                        fields2add, _ = extract_fields(response, dataset_name)
-                        if not fields2add:
-                            self.report.report_warning(
-                                key=endpoint_k, reason="No Fields"
-                            )
-                        schema_metadata = set_metadata(dataset_name, fields2add)
-                        dataset_snapshot.aspects.append(schema_metadata)
-
-                        yield from self.build_wu(dataset_snapshot, dataset_name)
-                    else:
-                        self.report_bad_responses(response.status_code, key=endpoint_k)
                 else:
                     composed_url = compose_url_attr(
                         raw_url=endpoint_k, attr_list=config.forced_examples[endpoint_k]
                     )
                     tot_url = clean_url(config.url + self.url_basepath + composed_url)
-                    if config.token:
-                        response = request_call(tot_url, token=config.token)
-                    else:
-                        response = request_call(
-                            tot_url, username=config.username, password=config.password
+                if config.token:
+                    response = request_call(tot_url, token=config.token)
+                else:
+                    response = request_call(
+                        tot_url, username=config.username, password=config.password
+                    )
+                if response.status_code == 200:
+                    fields2add, _ = extract_fields(response, dataset_name)
+                    if not fields2add:
+                        self.report.report_warning(
+                            key=endpoint_k, reason="No Fields"
                         )
-                    if response.status_code == 200:
-                        fields2add, _ = extract_fields(response, dataset_name)
-                        if not fields2add:
-                            self.report.report_warning(
-                                key=endpoint_k, reason="No Fields"
-                            )
-                        schema_metadata = set_metadata(dataset_name, fields2add)
-                        dataset_snapshot.aspects.append(schema_metadata)
+                    schema_metadata = set_metadata(dataset_name, fields2add)
+                    dataset_snapshot.aspects.append(schema_metadata)
 
-                        yield from self.build_wu(dataset_snapshot, dataset_name)
-                    else:
-                        self.report_bad_responses(response.status_code, key=endpoint_k)
+                    yield from self.build_wu(dataset_snapshot, dataset_name)
+                else:
+                    self.report_bad_responses(response.status_code, key=endpoint_k)
 
     def get_report(self):
         return self.report

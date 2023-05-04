@@ -205,10 +205,8 @@ def test_simple_dataset_ownership_transformation(mock_time):
     assert len(last_event.aspect.owners) == 2
     assert last_event.entityUrn == outputs[0].record.proposedSnapshot.urn
     assert all(
-        [
-            owner.type == models.OwnershipTypeClass.DATAOWNER
-            for owner in last_event.aspect.owners
-        ]
+        owner.type == models.OwnershipTypeClass.DATAOWNER
+        for owner in last_event.aspect.owners
     )
 
     # Check the second entry.
@@ -218,10 +216,8 @@ def test_simple_dataset_ownership_transformation(mock_time):
     assert second_ownership_aspect
     assert len(second_ownership_aspect.owners) == 3
     assert all(
-        [
-            owner.type == models.OwnershipTypeClass.DATAOWNER
-            for owner in second_ownership_aspect.owners
-        ]
+        owner.type == models.OwnershipTypeClass.DATAOWNER
+        for owner in second_ownership_aspect.owners
     )
 
     # Verify that the third entry is unchanged.
@@ -737,10 +733,8 @@ def test_pattern_dataset_ownership_transformation(mock_time):
     assert first_ownership_aspect
     assert len(first_ownership_aspect.owners) == 1
     assert all(
-        [
-            owner.type == models.OwnershipTypeClass.DATAOWNER
-            for owner in first_ownership_aspect.owners
-        ]
+        owner.type == models.OwnershipTypeClass.DATAOWNER
+        for owner in first_ownership_aspect.owners
     )
 
     # Check the second entry.
@@ -750,10 +744,8 @@ def test_pattern_dataset_ownership_transformation(mock_time):
     assert second_ownership_aspect
     assert len(second_ownership_aspect.owners) == 2
     assert all(
-        [
-            owner.type == models.OwnershipTypeClass.DATAOWNER
-            for owner in second_ownership_aspect.owners
-        ]
+        owner.type == models.OwnershipTypeClass.DATAOWNER
+        for owner in second_ownership_aspect.owners
     )
 
     # Verify that the third entry is unchanged.
@@ -973,7 +965,7 @@ def test_simple_add_dataset_properties(mock_time):
         outputs[0].record, models.DatasetPropertiesClass
     )
 
-    print(str(custom_properties))
+    print(custom_properties)
     assert custom_properties is not None
     assert custom_properties.customProperties == {
         **EXISTING_PROPERTIES,

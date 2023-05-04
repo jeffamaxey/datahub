@@ -109,7 +109,7 @@ class DataJob:
         return [tags]
 
     def generate_mce(self) -> MetadataChangeEventClass:
-        job_mce = MetadataChangeEventClass(
+        return MetadataChangeEventClass(
             proposedSnapshot=DataJobSnapshotClass(
                 urn=str(self.urn),
                 aspects=[
@@ -131,10 +131,8 @@ class DataJob:
             )
         )
 
-        return job_mce
-
     def generate_mcp(self) -> Iterable[MetadataChangeProposalWrapper]:
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="datajob",
             entityUrn=str(self.urn),
             aspectName="dataJobInfo",
@@ -147,29 +145,24 @@ class DataJob:
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
-
         yield from self.generate_data_input_output_mcp()
 
         for owner in self.generate_ownership_aspect():
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="datajob",
                 entityUrn=str(self.urn),
                 aspectName="ownership",
                 aspect=owner,
                 changeType=ChangeTypeClass.UPSERT,
             )
-            yield mcp
-
         for tag in self.generate_tags_aspect():
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="datajob",
                 entityUrn=str(self.urn),
                 aspectName="globalTags",
                 aspect=tag,
                 changeType=ChangeTypeClass.UPSERT,
             )
-            yield mcp
 
     def emit(
         self,
@@ -193,7 +186,7 @@ class DataJob:
                 rest_emitter.emit(mcp)
 
     def generate_data_input_output_mcp(self) -> Iterable[MetadataChangeProposalWrapper]:
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="datajob",
             entityUrn=str(self.urn),
             aspectName="dataJobInputOutput",
@@ -204,16 +197,12 @@ class DataJob:
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
-
         # Force entity materialization
         for iolet in self.inlets + self.outlets:
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="dataset",
                 entityUrn=str(iolet),
                 aspectName="status",
                 aspect=StatusClass(removed=False),
                 changeType=ChangeTypeClass.UPSERT,
             )
-
-            yield mcp

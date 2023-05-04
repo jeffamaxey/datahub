@@ -18,7 +18,4 @@ def get_first_missing_key(inp_dict: Dict, keys: List[str]) -> Optional[str]:
 def get_first_missing_key_any(
     inp_dict: Dict[str, Any], keys: List[str]
 ) -> Optional[str]:
-    for key in keys:
-        if key not in inp_dict:
-            return key
-    return None
+    return next((key for key in keys if key not in inp_dict), None)

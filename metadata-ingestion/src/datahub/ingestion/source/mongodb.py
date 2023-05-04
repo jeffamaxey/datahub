@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 # See https://docs.mongodb.com/manual/reference/local-database/ and
 # https://docs.mongodb.com/manual/reference/config-database/ and
 # https://stackoverflow.com/a/48273736/5004662.
-DENY_DATABASE_LIST = set(["admin", "config", "local"])
+DENY_DATABASE_LIST = {"admin", "config", "local"}
 
 
 class MongoDBConfig(ConfigModel):
@@ -143,9 +143,9 @@ def construct_schema_pymongo(
             maximum size of the document that will be considered for generating the schema.
     """
 
-    doc_size_field = "temporary_doc_size_field"
     aggregations: List[Dict] = []
     if is_version_gte_4_4:
+        doc_size_field = "temporary_doc_size_field"
         # create a temporary field to store the size of the document. filter on it and then remove it.
         aggregations = [
             {"$addFields": {doc_size_field: {"$bsonSize": "$$ROOT"}}},
@@ -155,14 +155,12 @@ def construct_schema_pymongo(
     if use_random_sampling:
         # get sample documents in collection
         aggregations.append({"$sample": {"size": sample_size}})
-        documents = collection.aggregate(
-            aggregations,
-            allowDiskUse=True,
-        )
     else:
         aggregations.append({"$limit": sample_size})
-        documents = collection.aggregate(aggregations, allowDiskUse=True)
-
+    documents = collection.aggregate(
+        aggregations,
+        allowDiskUse=True,
+    )
     return construct_schema(list(documents), delimiter)
 
 
@@ -313,7 +311,7 @@ class MongoDBSource(Source):
                             collection_schema.values(),
                             key=lambda x: x["count"],
                             reverse=True,
-                        )[0:max_schema_size]
+                        )[:max_schema_size]
                         # Add this information to the custom properties so user can know they are looking at downsampled schema
                         dataset_properties.customProperties[
                             "schema.downsampled"
@@ -365,8 +363,9 @@ class MongoDBSource(Source):
 
     def is_server_version_gte_4_4(self) -> bool:
         try:
-            server_version = self.mongo_client.server_info().get("versionArray")
-            if server_version:
+            if server_version := self.mongo_client.server_info().get(
+                "versionArray"
+            ):
                 logger.info(
                     f"Mongodb version for current connection - {server_version}"
                 )

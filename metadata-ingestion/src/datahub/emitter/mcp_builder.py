@@ -33,7 +33,7 @@ class DatahubKey(BaseModel):
             cls=DatahubKeyJSONEncoder,
         )
         md5_hash = hashlib.md5(json_key.encode("utf-8"))
-        return str(md5_hash.hexdigest())
+        return md5_hash.hexdigest()
 
 
 class PlatformKey(DatahubKey):
@@ -88,8 +88,7 @@ def add_domain_to_entity_wu(
         aspectName="domains",
         aspect=DomainsClass(domains=[domain_urn]),
     )
-    wu = MetadataWorkUnit(id=f"{domain_urn}-to-{entity_urn}", mcp=mcp)
-    yield wu
+    yield MetadataWorkUnit(id=f"{domain_urn}-to-{entity_urn}", mcp=mcp)
 
 
 def add_owner_to_entity_wu(
@@ -109,8 +108,7 @@ def add_owner_to_entity_wu(
             ]
         ),
     )
-    wu = MetadataWorkUnit(id=f"{owner_urn}-to-{entity_urn}", mcp=mcp)
-    yield wu
+    yield MetadataWorkUnit(id=f"{owner_urn}-to-{entity_urn}", mcp=mcp)
 
 
 def add_tags_to_entity_wu(
@@ -125,8 +123,7 @@ def add_tags_to_entity_wu(
             tags=[TagAssociationClass(f"urn:li:tag:{tag}") for tag in tags]
         ),
     )
-    wu = MetadataWorkUnit(id=f"tags-to-{entity_urn}", mcp=mcp)
-    yield wu
+    yield MetadataWorkUnit(id=f"tags-to-{entity_urn}", mcp=mcp)
 
 
 def gen_containers(
@@ -156,9 +153,7 @@ def gen_containers(
             externalUrl=external_url,
         ),
     )
-    wu = MetadataWorkUnit(id=f"container-info-{name}-{container_urn}", mcp=mcp)
-    yield wu
-
+    yield MetadataWorkUnit(id=f"container-info-{name}-{container_urn}", mcp=mcp)
     mcp = MetadataChangeProposalWrapper(
         entityType="container",
         changeType=ChangeTypeClass.UPSERT,
@@ -169,11 +164,9 @@ def gen_containers(
             platform=f"{make_data_platform_urn(container_key.platform)}",
         ),
     )
-    wu = MetadataWorkUnit(
+    yield MetadataWorkUnit(
         id=f"container-platforminstance-{name}-{container_urn}", mcp=mcp
     )
-    yield wu
-
     # Set subtype
     subtype_mcp = MetadataChangeProposalWrapper(
         entityType="container",
@@ -183,11 +176,9 @@ def gen_containers(
         aspectName="subTypes",
         aspect=SubTypesClass(typeNames=sub_types),
     )
-    wu = MetadataWorkUnit(
+    yield MetadataWorkUnit(
         id=f"container-subtypes-{name}-{container_urn}", mcp=subtype_mcp
     )
-    yield wu
-
     if domain_urn:
         yield from add_domain_to_entity_wu(
             entity_type="container",
@@ -224,12 +215,10 @@ def gen_containers(
             aspect=ContainerClass(container=parent_container_urn),
             # aspect=ContainerKeyClass(guid=database_container_key.guid())
         )
-        wu = MetadataWorkUnit(
+        yield MetadataWorkUnit(
             id=f"container-parent-container-{name}-{container_urn}-{parent_container_urn}",
             mcp=parent_container_mcp,
         )
-
-        yield wu
 
 
 def add_dataset_to_container(
@@ -247,8 +236,9 @@ def add_dataset_to_container(
         aspect=ContainerClass(container=f"{container_urn}"),
         # aspect=ContainerKeyClass(guid=schema_container_key.guid())
     )
-    wu = MetadataWorkUnit(id=f"container-{container_urn}-to-{dataset_urn}", mcp=mcp)
-    yield wu
+    yield MetadataWorkUnit(
+        id=f"container-{container_urn}-to-{dataset_urn}", mcp=mcp
+    )
 
 
 def add_entity_to_container(
@@ -264,5 +254,6 @@ def add_entity_to_container(
         aspectName="container",
         aspect=ContainerClass(container=f"{container_urn}"),
     )
-    wu = MetadataWorkUnit(id=f"container-{container_urn}-to-{entity_urn}", mcp=mcp)
-    yield wu
+    yield MetadataWorkUnit(
+        id=f"container-{container_urn}-to-{entity_urn}", mcp=mcp
+    )

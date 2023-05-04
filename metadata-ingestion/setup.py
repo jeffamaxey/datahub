@@ -272,8 +272,6 @@ base_dev_requirements = {
     "flake8-tidy-imports>=4.3.0",
     "isort>=5.7.0",
     "mypy>=0.920",
-    # pydantic 1.8.2 is incompatible with mypy 0.910.
-    # See https://github.com/samuelcolvin/pydantic/pull/3175#issuecomment-995382910.
     "pydantic>=1.9.0",
     "pytest>=6.2.2",
     "pytest-asyncio>=0.16.0",
@@ -287,7 +285,7 @@ base_dev_requirements = {
     "build",
     "twine",
     "packaging",
-    *list(
+    *[
         dependency
         for plugin in [
             "bigquery",
@@ -319,7 +317,7 @@ base_dev_requirements = {
             # airflow is added below
         ]
         for dependency in plugins[plugin]
-    ),
+    ],
 }
 
 if is_py37_or_newer:
@@ -345,7 +343,7 @@ dev_requirements_airflow_1 = {
 }
 
 full_test_dev_requirements = {
-    *list(
+    *[
         dependency
         for plugin in [
             # Only include Athena for Python 3.7 or newer.
@@ -364,7 +362,7 @@ full_test_dev_requirements = {
             "kafka-connect",
         ]
         for dependency in plugins[plugin]
-    ),
+    ]
 }
 
 entry_points = {

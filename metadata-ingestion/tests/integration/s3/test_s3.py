@@ -21,12 +21,11 @@ def bucket_name():
 @pytest.fixture(scope="module", autouse=True)
 def s3_client():
     with mock_s3():
-        conn = Session(
+        yield Session(
             aws_access_key_id="test",
             aws_secret_access_key="test",
             region_name="us-east-1",
         ).resource("s3")
-        yield conn
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -58,17 +57,16 @@ def test_data_lake_s3_ingest(
     f = open(os.path.join(SOURCE_FILES_PATH, source_file))
     source = json.load(f)
 
-    config_dict = {}
-    config_dict["source"] = source
-    config_dict["sink"] = {
-        "type": "file",
-        "config": {
-            "filename": f"{tmp_path}/{source_file}",
+    config_dict = {
+        "source": source,
+        "sink": {
+            "type": "file",
+            "config": {
+                "filename": f"{tmp_path}/{source_file}",
+            },
         },
+        "run_id": source_file,
     }
-
-    config_dict["run_id"] = source_file
-
     pipeline = Pipeline.create(config_dict)
     pipeline.run()
     pipeline.raise_from_status()
@@ -88,22 +86,21 @@ def test_data_lake_local_ingest(pytestconfig, source_file, tmp_path, mock_time):
     f = open(os.path.join(SOURCE_FILES_PATH, source_file))
     source = json.load(f)
 
-    config_dict = {}
     source["config"]["path_spec"]["include"] = source["config"]["path_spec"][
         "include"
     ].replace("s3://my-test-bucket/", "tests/integration/s3/test_data/local_system/")
     source["config"]["profiling"]["enabled"] = True
     source["config"].pop("aws_config")
-    config_dict["source"] = source
-    config_dict["sink"] = {
-        "type": "file",
-        "config": {
-            "filename": f"{tmp_path}/{source_file}",
+    config_dict = {
+        "source": source,
+        "sink": {
+            "type": "file",
+            "config": {
+                "filename": f"{tmp_path}/{source_file}",
+            },
         },
+        "run_id": source_file,
     }
-
-    config_dict["run_id"] = source_file
-
     pipeline = Pipeline.create(config_dict)
     pipeline.run()
     pipeline.raise_from_status()
@@ -118,14 +115,6 @@ def test_data_lake_local_ingest(pytestconfig, source_file, tmp_path, mock_time):
 
 def test_data_lake_incorrect_config_raises_error(tmp_path, mock_time):
 
-    config_dict = {}
-    config_dict["sink"] = {
-        "type": "file",
-        "config": {
-            "filename": f"{tmp_path}/mces.json",
-        },
-    }
-
     # Case 1 : named variable in table name is not present in include
     source = {
         "type": "s3",
@@ -133,7 +122,15 @@ def test_data_lake_incorrect_config_raises_error(tmp_path, mock_time):
             "path_spec": {"include": "a/b/c/d/{table}.*", "table_name": "{table1}"}
         },
     }
-    config_dict["source"] = source
+    config_dict = {
+        "sink": {
+            "type": "file",
+            "config": {
+                "filename": f"{tmp_path}/mces.json",
+            },
+        },
+        "source": source,
+    }
     with pytest.raises(ValidationError) as e_info:
         pipeline = Pipeline.create(config_dict)
         pipeline.run()

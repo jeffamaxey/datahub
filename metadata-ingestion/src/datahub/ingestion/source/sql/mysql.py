@@ -33,10 +33,7 @@ class MySQLConfig(BasicSQLAlchemyConfig):
 
     def get_identifier(self, *, schema: str, table: str) -> str:
         regular = f"{schema}.{table}"
-        if self.database_alias:
-            return f"{self.database_alias}.{table}"
-        else:
-            return regular
+        return f"{self.database_alias}.{table}" if self.database_alias else regular
 
 
 class MySQLSource(SQLAlchemySource):

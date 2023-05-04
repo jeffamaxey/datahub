@@ -281,12 +281,11 @@ class SnowflakeUsageSource(StatefulIngestionSourceBase):
     def _make_sql_engine(self) -> Engine:
         url = self.config.get_sql_alchemy_url()
         logger.debug(f"sql_alchemy_url={url}")
-        engine = create_engine(
+        return create_engine(
             url,
             connect_args=self.config.get_sql_alchemy_connect_args(),
             **self.config.options,
         )
-        return engine
 
     def _check_usage_date_ranges(self, engine: Engine) -> Any:
 
@@ -319,21 +318,20 @@ class SnowflakeUsageSource(StatefulIngestionSourceBase):
                 self.error(logger, "check-usage-data", f"Error was {e}")
 
     def _is_unsupported_object_accessed(self, obj: Dict[str, Any]) -> bool:
-        unsupported_keys = ["locations"]
-
         if obj.get("objectDomain") in ["Stage"]:
             return True
 
-        return any([obj.get(key) is not None for key in unsupported_keys])
+        unsupported_keys = ["locations"]
+
+        return any(obj.get(key) is not None for key in unsupported_keys)
 
     def _is_object_valid(self, obj: Dict[str, Any]) -> bool:
-        if self._is_unsupported_object_accessed(
-            obj
-        ) or not self._is_dataset_pattern_allowed(
-            obj.get("objectName"), obj.get("objectDomain")
-        ):
-            return False
-        return True
+        return bool(
+            not self._is_unsupported_object_accessed(obj)
+            and self._is_dataset_pattern_allowed(
+                obj.get("objectName"), obj.get("objectDomain")
+            )
+        )
 
     def _is_dataset_pattern_allowed(
         self, dataset_name: Optional[Any], dataset_type: Optional[Any]
@@ -354,26 +352,21 @@ class SnowflakeUsageSource(StatefulIngestionSourceBase):
         ):
             return False
 
-        if dataset_type.lower() in {
-            "view",
-            "materialized_view",
-        } and not self.config.view_pattern.allowed(dataset_params[2]):
-            return False
-
-        return True
+        return bool(
+            dataset_type.lower()
+            not in {
+                "view",
+                "materialized_view",
+            }
+            or self.config.view_pattern.allowed(dataset_params[2])
+        )
 
     def _process_snowflake_history_row(
         self, row: Any
     ) -> Iterable[SnowflakeJoinedAccessEvent]:
         self.report.rows_processed += 1
         # Make some minor type conversions.
-        if hasattr(row, "_asdict"):
-            # Compat with SQLAlchemy 1.3 and 1.4
-            # See https://docs.sqlalchemy.org/en/14/changelog/migration_14.html#rowproxy-is-no-longer-a-proxy-is-now-called-row-and-behaves-like-an-enhanced-named-tuple.
-            event_dict = row._asdict()
-        else:
-            event_dict = dict(row)
-
+        event_dict = row._asdict() if hasattr(row, "_asdict") else dict(row)
         # no use processing events that don't have a query text
         if not event_dict["query_text"]:
             self.report.rows_missing_query_text += 1
@@ -413,8 +406,7 @@ class SnowflakeUsageSource(StatefulIngestionSourceBase):
             ] = f'{event_dict["user_name"]}@{self.config.email_domain}'.lower()
 
         try:  # big hammer try block to ensure we don't fail on parsing events
-            event = SnowflakeJoinedAccessEvent(**event_dict)
-            yield event
+            yield SnowflakeJoinedAccessEvent(**event_dict)
         except Exception as e:
             self.report.rows_parsing_error += 1
             self.warn(logger, "usage", f"Failed to parse usage line {event_dict}, {e}")
@@ -443,39 +435,42 @@ class SnowflakeUsageSource(StatefulIngestionSourceBase):
     def _get_operation_aspect_work_unit(
         self, event: SnowflakeJoinedAccessEvent
     ) -> Iterable[MetadataWorkUnit]:
-        if event.query_start_time and event.query_type in OPERATION_STATEMENT_TYPES:
-            start_time = event.query_start_time
-            query_type = event.query_type
-            user_email = event.email
-            operation_type = OPERATION_STATEMENT_TYPES[query_type]
-            last_updated_timestamp: int = int(start_time.timestamp() * 1000)
-            user_urn = builder.make_user_urn(user_email.split("@")[0])
-            for obj in event.base_objects_accessed:
-                resource = obj.objectName
-                dataset_urn = builder.make_dataset_urn_with_platform_instance(
-                    "snowflake",
-                    resource.lower(),
-                    self.config.platform_instance,
-                    self.config.env,
-                )
-                operation_aspect = OperationClass(
-                    timestampMillis=last_updated_timestamp,
-                    lastUpdatedTimestamp=last_updated_timestamp,
-                    actor=user_urn,
-                    operationType=operation_type,
-                )
-                mcp = MetadataChangeProposalWrapper(
-                    entityType="dataset",
-                    aspectName="operation",
-                    changeType=ChangeTypeClass.UPSERT,
-                    entityUrn=dataset_urn,
-                    aspect=operation_aspect,
-                )
-                wu = MetadataWorkUnit(
-                    id=f"{start_time.isoformat()}-operation-aspect-{resource}",
-                    mcp=mcp,
-                )
-                yield wu
+        if (
+            not event.query_start_time
+            or event.query_type not in OPERATION_STATEMENT_TYPES
+        ):
+            return
+        start_time = event.query_start_time
+        query_type = event.query_type
+        user_email = event.email
+        operation_type = OPERATION_STATEMENT_TYPES[query_type]
+        last_updated_timestamp: int = int(start_time.timestamp() * 1000)
+        user_urn = builder.make_user_urn(user_email.split("@")[0])
+        for obj in event.base_objects_accessed:
+            resource = obj.objectName
+            dataset_urn = builder.make_dataset_urn_with_platform_instance(
+                "snowflake",
+                resource.lower(),
+                self.config.platform_instance,
+                self.config.env,
+            )
+            operation_aspect = OperationClass(
+                timestampMillis=last_updated_timestamp,
+                lastUpdatedTimestamp=last_updated_timestamp,
+                actor=user_urn,
+                operationType=operation_type,
+            )
+            mcp = MetadataChangeProposalWrapper(
+                entityType="dataset",
+                aspectName="operation",
+                changeType=ChangeTypeClass.UPSERT,
+                entityUrn=dataset_urn,
+                aspect=operation_aspect,
+            )
+            yield MetadataWorkUnit(
+                id=f"{start_time.isoformat()}-operation-aspect-{resource}",
+                mcp=mcp,
+            )
 
     def _aggregate_access_events(
         self, events: Iterable[SnowflakeJoinedAccessEvent]

@@ -61,9 +61,7 @@ class DatahubIngestionReportingProvider(IngestionReportingProviderBase):
 
     def _is_server_stateful_ingestion_capable(self) -> bool:
         server_config = self.graph.get_config() if self.graph else None
-        if server_config and server_config.get("statefulIngestionCapable"):
-            return True
-        return False
+        return bool(server_config and server_config.get("statefulIngestionCapable"))
 
     def get_latest_run_summary(
         self,
@@ -80,9 +78,7 @@ class DatahubIngestionReportingProvider(IngestionReportingProviderBase):
         data_job_urn = self.get_data_job_urn(
             self.orchestrator_name, pipeline_name, job_name, platform_instance_id
         )
-        latest_run_summary: Optional[
-            DatahubIngestionRunSummaryClass
-        ] = self.graph.get_latest_timeseries_value(
+        if latest_run_summary := self.graph.get_latest_timeseries_value(
             entity_urn=data_job_urn,
             aspect_name="datahubIngestionRunSummary",
             filter_criteria_map={
@@ -90,8 +86,7 @@ class DatahubIngestionReportingProvider(IngestionReportingProviderBase):
                 "platformInstanceId": platform_instance_id,
             },
             aspect_type=DatahubIngestionRunSummaryClass,
-        )
-        if latest_run_summary:
+        ):
             logger.info(
                 f"The latest saved run summary for pipelineName:'{pipeline_name}',"
                 f" platformInstanceId:'{platform_instance_id}', job_name:'{job_name}' found with start_time:"

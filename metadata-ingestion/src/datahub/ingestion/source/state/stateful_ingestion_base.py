@@ -50,11 +50,10 @@ class StatefulIngestionConfig(ConfigModel):
 
     @pydantic.root_validator()
     def validate_config(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        if values.get("enabled"):
-            if values.get("state_provider") is None:
-                values["state_provider"] = DynamicTypedConfig(
-                    type="datahub", config=None
-                )
+        if values.get("enabled") and values.get("state_provider") is None:
+            values["state_provider"] = DynamicTypedConfig(
+                type="datahub", config=None
+            )
         return values
 
 
@@ -149,13 +148,13 @@ class StatefulIngestionSourceBase(Source):
             )
 
     def is_stateful_ingestion_configured(self) -> bool:
-        if (
-            self.stateful_ingestion_config is not None
-            and self.stateful_ingestion_config.enabled
-            and self.ingestion_checkpointing_state_provider is not None
-        ):
-            return True
-        return False
+        return bool(
+            (
+                self.stateful_ingestion_config is not None
+                and self.stateful_ingestion_config.enabled
+                and self.ingestion_checkpointing_state_provider is not None
+            )
+        )
 
     # Basic methods that sub-classes must implement
     def create_checkpoint(self, job_id: JobId) -> Optional[Checkpoint]:

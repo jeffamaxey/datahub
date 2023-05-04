@@ -220,11 +220,16 @@ def resolve_postgres_modified_type(type_string: str) -> Any:
     if type_string.endswith("[]"):
         return ArrayType
 
-    for modified_type_base in POSTGRES_MODIFIED_TYPES:
-        if re.match(rf"{re.escape(modified_type_base)}\([0-9,]+\)", type_string):
-            return POSTGRES_TYPES_MAP[modified_type_base]
-
-    return None
+    return next(
+        (
+            POSTGRES_TYPES_MAP[modified_type_base]
+            for modified_type_base in POSTGRES_MODIFIED_TYPES
+            if re.match(
+                rf"{re.escape(modified_type_base)}\([0-9,]+\)", type_string
+            )
+        ),
+        None,
+    )
 
 
 # see https://docs.snowflake.com/en/sql-reference/intro-summary-data-types.html

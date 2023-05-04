@@ -634,8 +634,8 @@ def test_get_full_qualified_name():
         },
     ]
 
-    expected = list()
-    result = list()
+    expected = []
+    result = []
 
     for sql_table_name in test_sql_table_names:
         platform = sql_table_name["platform"]

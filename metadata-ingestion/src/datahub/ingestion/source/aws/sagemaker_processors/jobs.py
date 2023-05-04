@@ -73,7 +73,7 @@ class JobType(Enum):
     TRANSFORM = "transform"
 
 
-job_types = sorted([x for x in JobType], key=lambda x: x.value)
+job_types = sorted(list(JobType), key=lambda x: x.value)
 
 job_type_to_info: Mapping[JobType, Any] = {
     JobType.AUTO_ML: AutoMlJobInfo(),
@@ -307,7 +307,7 @@ class JobProcessor:
             for output_job_urn in processed_job.output_jobs:
                 processed_jobs[output_job_urn].input_jobs.add(output_job_urn)
 
-            all_datasets.update(processed_job.input_datasets)
+            all_datasets |= processed_job.input_datasets
             all_datasets.update(processed_job.output_datasets)
 
         # yield datasets
@@ -892,25 +892,22 @@ class JobProcessor:
             config.get("S3OutputPath") for config in profiler_rule_configs
         ]
 
-        output_datasets = {}
-
-        # process all output datasets at once
-        for output_s3_uri in [
-            output_s3_uri,
-            checkpoint_s3_uri,
-            debug_s3_path,
-            tensorboard_output_path,
-            profiler_output_path,
-            *processed_debug_configs,
-            *processed_profiler_configs,
-        ]:
-
-            if output_s3_uri is not None:
-                output_datasets[make_s3_urn(output_s3_uri, self.env)] = {
-                    "dataset_type": "s3",
-                    "uri": output_s3_uri,
-                }
-
+        output_datasets = {
+            make_s3_urn(output_s3_uri, self.env): {
+                "dataset_type": "s3",
+                "uri": output_s3_uri,
+            }
+            for output_s3_uri in [
+                output_s3_uri,
+                checkpoint_s3_uri,
+                debug_s3_path,
+                tensorboard_output_path,
+                profiler_output_path,
+                *processed_debug_configs,
+                *processed_profiler_configs,
+            ]
+            if output_s3_uri is not None
+        }
         job_snapshot, job_name, job_arn = self.create_common_job_snapshot(
             job,
             JOB_TYPE,

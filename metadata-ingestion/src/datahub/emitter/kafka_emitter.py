@@ -41,20 +41,18 @@ class KafkaEmitterConfig(ConfigModel):
     @root_validator
     def validate_topic_routes(cls: "KafkaEmitterConfig", values: dict) -> dict:
         old_topic = values["topic"]
-        new_mce_topic = values["topic_routes"][MCE_KEY]
         if old_topic != DEFAULT_MCE_KAFKA_TOPIC:
-            # Looks like a non default topic has been set using the old style
+            new_mce_topic = values["topic_routes"][MCE_KEY]
             if new_mce_topic != DEFAULT_MCE_KAFKA_TOPIC:
                 # Looks like a non default topic has ALSO been set using the new style
                 raise ConfigurationError(
                     "Using both topic and topic_routes configuration for Kafka is not supported. Use only topic_routes"
                 )
-            else:
-                logger.warning(
-                    "Looks like you're using the deprecated `topic` configuration. Please migrate to `topic_routes`."
-                )
-                # upgrade topic provided to topic_routes mce entry
-                values["topic_routes"][MCE_KEY] = values["topic"]
+            logger.warning(
+                "Looks like you're using the deprecated `topic` configuration. Please migrate to `topic_routes`."
+            )
+            # upgrade topic provided to topic_routes mce entry
+            values["topic_routes"][MCE_KEY] = values["topic"]
         return values
 
 

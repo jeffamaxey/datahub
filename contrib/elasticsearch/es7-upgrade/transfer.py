@@ -60,8 +60,7 @@ class EsClients:
 
 
 def get_index_settings(client, pattern):
-    indices = elasticsearch.client.IndicesClient(client).get(pattern)
-    return indices
+    return elasticsearch.client.IndicesClient(client).get(pattern)
 
 
 def clean_settings(config):
@@ -122,7 +121,7 @@ def create_index(client, name, config, name_override=None):
     # Creates the given index on the client.
     indices_client = elasticsearch.client.IndicesClient(client)
     if indices_client.exists(name_override):
-        print('WARNING: Index %s already exists!' % name_override)
+        print(f'WARNING: Index {name_override} already exists!')
         return
     indices_client.create(name_override, body=config)
 
@@ -175,7 +174,9 @@ def reindex(
                     timing_samples.pop(0)
                 count_at_last_update = count
                 last_print = time.time()
-                print('Transferring %s docs/second. Total %s.' % (sum(timing_samples) / len(timing_samples), count))
+                print(
+                    f'Transferring {sum(timing_samples) / len(timing_samples)} docs/second. Total {count}.'
+                )
 
             yield h
 
@@ -193,7 +194,7 @@ def reindex(
 def copy_index_data(clients, index, name_override):
     # Copies all documents from the source to the dest index.
     name_override = index if name_override is None else name_override
-    print('Copying index %s' % index)
+    print(f'Copying index {index}')
     start = time.time()
     res = reindex(
         clients.source_client,
@@ -203,13 +204,13 @@ def copy_index_data(clients, index, name_override):
     )
     end = time.time()
     print('Documents written %s. Errors %s.' % res)
-    print('Took %s seconds.' % (end - start))
+    print(f'Took {end - start} seconds.')
 
 
 def main():
     ssl_context = create_ssl_context() if not args.disable_source_ssl or not args.disable_dest_ssl else None
-    source_ssl_context = ssl_context if not args.disable_source_ssl else None
-    dest_ssl_context = ssl_context if not args.disable_dest_ssl else None
+    source_ssl_context = None if args.disable_source_ssl else ssl_context
+    dest_ssl_context = None if args.disable_dest_ssl else ssl_context
     clients = EsClients(create_client(args.source, source_ssl_context), create_client(args.dest, dest_ssl_context))
     indices = get_index_settings(clients.source_client, args.indices)
 
@@ -227,7 +228,9 @@ def main():
 
         config = clean_settings(config)
         config = update_for_seven(config)
-        print('Creating index %s' % (index if args.name_override is None else args.name_override))
+        print(
+            f'Creating index {index if args.name_override is None else args.name_override}'
+        )
         create_index(clients.dest_client, index, config, args.name_override)
 
     if args.create_only:

@@ -105,17 +105,19 @@ class MockIndexGenerator:
             )
             # emit one record per column
             for c in range(self._num_cols):
-                yield self._get_index_row_json((
-                    f"table_1",
-                    None,
-                    None,
-                    f"col_{c}",
-                    self._get_num_nulls(i, c),
-                    self._get_event_time_ms(i),
-                    HOUR_IN_MS,
-                    None,
-                    None,
-                    None)
+                yield self._get_index_row_json(
+                    (
+                        "table_1",
+                        None,
+                        None,
+                        f"col_{c}",
+                        self._get_num_nulls(i, c),
+                        self._get_event_time_ms(i),
+                        HOUR_IN_MS,
+                        None,
+                        None,
+                        None,
+                    )
                 )
 
     @staticmethod

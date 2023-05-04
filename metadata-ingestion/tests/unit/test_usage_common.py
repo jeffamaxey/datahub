@@ -48,7 +48,7 @@ def test_add_one_query_with_ignored_user():
     ta = _TestAggregatedDataset(
         bucket_start_time=floored_ts,
         resource=resource,
-        user_email_pattern=AllowDenyPattern(deny=list(["test_email@test.com"])),
+        user_email_pattern=AllowDenyPattern(deny=["test_email@test.com"]),
     )
     ta.add_read_entry(
         test_email,
@@ -74,7 +74,7 @@ def test_multiple_query_with_ignored_user():
     ta = _TestAggregatedDataset(
         bucket_start_time=floored_ts,
         resource=resource,
-        user_email_pattern=AllowDenyPattern(deny=list(["test_email@test.com"])),
+        user_email_pattern=AllowDenyPattern(deny=["test_email@test.com"]),
     )
     ta.add_read_entry(
         test_email,

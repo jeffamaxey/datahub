@@ -370,20 +370,20 @@ def test_lineage_backend_capture_executions(mock_emit, inlets, outlets):
     mock_emitter = Mock()
     mock_emit.return_value = mock_emitter
     # Using autospec on xcom_pull and xcom_push methods fails on Python 3.6.
-    with mock.patch.dict(
-        os.environ,
-        {
-            "AIRFLOW__LINEAGE__BACKEND": "datahub_provider.lineage.datahub.DatahubLineageBackend",
-            "AIRFLOW__LINEAGE__DATAHUB_CONN_ID": datahub_rest_connection_config.conn_id,
-            "AIRFLOW__LINEAGE__DATAHUB_KWARGS": json.dumps(
-                {"graceful_exceptions": False, "capture_executions": True}
-            ),
-        },
-    ), mock.patch("airflow.models.BaseOperator.xcom_pull"), mock.patch(
-        "airflow.models.BaseOperator.xcom_push"
-    ), patch_airflow_connection(
-        datahub_rest_connection_config
-    ):
+    with (mock.patch.dict(
+            os.environ,
+            {
+                "AIRFLOW__LINEAGE__BACKEND": "datahub_provider.lineage.datahub.DatahubLineageBackend",
+                "AIRFLOW__LINEAGE__DATAHUB_CONN_ID": datahub_rest_connection_config.conn_id,
+                "AIRFLOW__LINEAGE__DATAHUB_KWARGS": json.dumps(
+                    {"graceful_exceptions": False, "capture_executions": True}
+                ),
+            },
+        ), mock.patch("airflow.models.BaseOperator.xcom_pull"), mock.patch(
+            "airflow.models.BaseOperator.xcom_push"
+        ), patch_airflow_connection(
+            datahub_rest_connection_config
+        )):
         func = mock.Mock()
         func.__name__ = "foo"
 
@@ -410,10 +410,6 @@ def test_lineage_backend_capture_executions(mock_emit, inlets, outlets):
             ti = TaskInstance(task=op2, execution_date=DEFAULT_DATE)
             # Ignoring type here because DagRun state is just a sring at Airflow 1
             dag_run = DagRun(state="success", run_id=f"scheduled_{DEFAULT_DATE}")  # type: ignore
-            ti.dag_run = dag_run
-            ti.start_date = datetime.datetime.utcnow()
-            ti.execution_date = DEFAULT_DATE
-
         else:
             from airflow.utils.state import DagRunState
 
@@ -421,9 +417,9 @@ def test_lineage_backend_capture_executions(mock_emit, inlets, outlets):
             dag_run = DagRun(
                 state=DagRunState.SUCCESS, run_id=f"scheduled_{DEFAULT_DATE}"
             )
-            ti.dag_run = dag_run
-            ti.start_date = datetime.datetime.utcnow()
-            ti.execution_date = DEFAULT_DATE
+        ti.dag_run = dag_run
+        ti.start_date = datetime.datetime.utcnow()
+        ti.execution_date = DEFAULT_DATE
 
         ctx1 = {
             "dag": dag,

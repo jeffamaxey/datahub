@@ -166,11 +166,11 @@ class LookerDashboardElement:
         # If the base_url contains a port number (like https://company.looker.com:19999) remove the port number
         m = re.match("^(.*):([0-9]+)$", base_url)
         if m is not None:
-            base_url = m.group(1)
+            base_url = m[1]
         if self.look_id is not None:
-            return base_url + "/looks/" + self.look_id
+            return f"{base_url}/looks/{self.look_id}"
         else:
-            return base_url + "/x/" + self.query_slug
+            return f"{base_url}/x/{self.query_slug}"
 
     def get_urn_element_id(self):
         # A dashboard element can use a look or just a raw query against an explore
@@ -220,23 +220,22 @@ class LookerUserRegistry:
     def get_by_id(
         self, id: int, transport_options: Optional[TransportOptions]
     ) -> Optional[LookerUser]:
-        logger.debug("Will get user {}".format(id))
+        logger.debug(f"Will get user {id}")
         if id in self.user_map:
             return self.user_map[id]
-        else:
-            try:
-                raw_user: User = self.client.user(
-                    id,
-                    fields=self.fields,
-                    transport_options=transport_options,
-                )
-                looker_user = LookerUser._from_user(raw_user)
-                self.user_map[id] = looker_user
-                return looker_user
-            except SDKError as e:
-                logger.warn("Could not find user with id {}".format(id))
-                logger.warn("Failure was {}".format(e))
-                return None
+        try:
+            raw_user: User = self.client.user(
+                id,
+                fields=self.fields,
+                transport_options=transport_options,
+            )
+            looker_user = LookerUser._from_user(raw_user)
+            self.user_map[id] = looker_user
+            return looker_user
+        except SDKError as e:
+            logger.warn(f"Could not find user with id {id}")
+            logger.warn(f"Failure was {e}")
+            return None
 
 
 @dataclass
@@ -256,8 +255,8 @@ class LookerDashboard:
         # If the base_url contains a port number (like https://company.looker.com:19999) remove the port number
         m = re.match("^(.*):([0-9]+)$", base_url)
         if m is not None:
-            base_url = m.group(1)
-        return base_url + "/dashboards/" + self.id
+            base_url = m[1]
+        return f"{base_url}/dashboards/{self.id}"
 
     def get_urn_dashboard_id(self):
         return f"dashboards.{self.id}"
@@ -285,8 +284,7 @@ class LookerDashboardSource(Source):
         assert (
             field.count(".") == 1
         ), f"Error: A field must be prefixed by a view name, field is: {field}"
-        view_name = field.split(".")[0]
-        return view_name
+        return field.split(".")[0]
 
     def _get_views_from_fields(self, fields: List[str]) -> List[str]:
         field_set = set(fields)
@@ -339,11 +337,7 @@ class LookerDashboardSource(Source):
         fields: Sequence[str] = query.fields if query.fields is not None else []
         for field in fields:
             # If the field is a custom field, look up the field it is based on
-            field_name = (
-                custom_field_to_underlying_field[field]
-                if field in custom_field_to_underlying_field
-                else field
-            )
+            field_name = custom_field_to_underlying_field.get(field, field)
             if field_name is None:
                 continue
 
@@ -355,11 +349,7 @@ class LookerDashboardSource(Source):
         )
         for field in filters.keys():
             # If the field is a custom field, look up the field it is based on
-            field_name = (
-                custom_field_to_underlying_field[field]
-                if field in custom_field_to_underlying_field
-                else field
-            )
+            field_name = custom_field_to_underlying_field.get(field, field)
             if field_name is None:
                 continue
             all_fields.add(field_name)
@@ -377,15 +367,9 @@ class LookerDashboardSource(Source):
             raise ValueError("Element ID can't be None")
 
         if element.query is not None:
-            explores = []
             fields = self._get_fields_from_query(element.query)
-            if element.query.view is not None:
-                # Get the explore from the view directly
-                explores = [element.query.view]
-
-            logger.debug(
-                "Element {}: Explores added: {}".format(element.title, explores)
-            )
+            explores = [element.query.view] if element.query.view is not None else []
+            logger.debug(f"Element {element.title}: Explores added: {explores}")
             for exp in explores:
                 self.explore_set.add((element.query.model, exp))
             return LookerDashboardElement(
@@ -402,7 +386,6 @@ class LookerDashboardSource(Source):
                 upstream_fields=fields,
             )
 
-        # Dashboard elements can *alternatively* link to an existing look
         elif element.look is not None:
             # we pick from element title by default, falling back to look title.
             title: str = (
@@ -416,9 +399,7 @@ class LookerDashboardSource(Source):
                 fields = self._get_fields_from_query(element.look.query)
                 if element.look.query.view is not None:
                     explores = [element.look.query.view]
-                logger.debug(
-                    "Element {}: Explores added: {}".format(element.title, explores)
-                )
+                logger.debug(f"Element {element.title}: Explores added: {explores}")
                 for exp in explores:
                     self.explore_set.add((element.look.query.model, exp))
 
@@ -440,7 +421,6 @@ class LookerDashboardSource(Source):
                     upstream_fields=fields,
                 )
 
-        # Failing the above two approaches, pick out details from result_maker
         elif element.result_maker is not None:
             model: str = ""
             fields = []
@@ -450,9 +430,7 @@ class LookerDashboardSource(Source):
                 if element.result_maker.query.view is not None:
                     explores.append(element.result_maker.query.view)
                 fields = self._get_fields_from_query(element.result_maker.query)
-                logger.debug(
-                    "Element {}: Explores added: {}".format(element.title, explores)
-                )
+                logger.debug(f"Element {element.title}: Explores added: {explores}")
 
                 for exp in explores:
                     self.explore_set.add((element.result_maker.query.model, exp))
@@ -738,19 +716,22 @@ class LookerDashboardSource(Source):
             if dashboard_owner.email is None:
                 self.email_ids_missing += 1
 
-        looker_dashboard = LookerDashboard(
+        return LookerDashboard(
             id=dashboard.id,
             title=dashboard.title,
             description=dashboard.description,
             dashboard_elements=dashboard_elements,
             created_at=dashboard.created_at,
-            is_deleted=dashboard.deleted if dashboard.deleted is not None else False,
-            is_hidden=dashboard.deleted if dashboard.deleted is not None else False,
+            is_deleted=dashboard.deleted
+            if dashboard.deleted is not None
+            else False,
+            is_hidden=dashboard.deleted
+            if dashboard.deleted is not None
+            else False,
             folder_path=dashboard_folder_path,
             owner=dashboard_owner,
             strip_user_ids_from_email=self.source_config.strip_user_ids_from_email,
         )
-        return looker_dashboard
 
     def process_dashboard(
         self, dashboard_id: str
@@ -785,16 +766,19 @@ class LookerDashboardSource(Source):
             )
             return [], dashboard_id, start_time, datetime.datetime.now()
 
-        if self.source_config.skip_personal_folders:
-            if dashboard_object.folder is not None and (
+        if (
+            self.source_config.skip_personal_folders
+            and dashboard_object.folder is not None
+            and (
                 dashboard_object.folder.is_personal
                 or dashboard_object.folder.is_personal_descendant
-            ):
-                self.reporter.report_warning(
-                    dashboard_id, "Dropped due to being a personal folder"
-                )
-                self.reporter.report_dashboards_dropped(dashboard_id)
-                return [], dashboard_id, start_time, datetime.datetime.now()
+            )
+        ):
+            self.reporter.report_warning(
+                dashboard_id, "Dropped due to being a personal folder"
+            )
+            self.reporter.report_dashboards_dropped(dashboard_id)
+            return [], dashboard_id, start_time, datetime.datetime.now()
 
         looker_dashboard = self._get_looker_dashboard(dashboard_object, self.client)
         mces = self._make_dashboard_and_chart_mces(looker_dashboard)
@@ -865,12 +849,10 @@ class LookerDashboardSource(Source):
                 workunit = MetadataWorkUnit(
                     id=f"looker-{event.entityUrn}-{event.aspectName}",
                     mcp=event,
-                    treat_errors_as_warnings=True
-                    if event.aspectName in ["subTypes"]
-                    else False,
+                    treat_errors_as_warnings=event.aspectName in ["subTypes"],
                 )
             else:
-                raise Exception("Unexpected type of event {}".format(event))
+                raise Exception(f"Unexpected type of event {event}")
 
             self.reporter.report_workunit(workunit)
             yield workunit

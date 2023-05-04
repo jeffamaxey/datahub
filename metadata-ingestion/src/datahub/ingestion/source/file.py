@@ -22,8 +22,7 @@ def _iterate_file(path: str) -> list:
 
 def iterate_mce_file(path: str) -> Iterator[MetadataChangeEvent]:
     for obj in _iterate_file(path):
-        mce: MetadataChangeEvent = MetadataChangeEvent.from_obj(obj)
-        yield mce
+        yield MetadataChangeEvent.from_obj(obj)
 
 
 def iterate_generic_file(

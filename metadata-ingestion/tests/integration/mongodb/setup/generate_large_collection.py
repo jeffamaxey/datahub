@@ -19,7 +19,7 @@ def generate_record(fields):
     for f_name, probability in fields:
         dice = random.randint(0, 100)
         if dice < probability:
-            record[f_name] = "".join(random.choice(letters) for i in range(0, 10))
+            record[f_name] = "".join(random.choice(letters) for _ in range(0, 10))
     return record
 
 

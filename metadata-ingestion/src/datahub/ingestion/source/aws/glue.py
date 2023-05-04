@@ -85,11 +85,12 @@ class GlueSourceConfig(AwsSourceConfig, PlatformSourceConfigBase):
 
     @validator("glue_s3_lineage_direction")
     def check_direction(cls, v: str) -> str:
-        if v.lower() not in ["upstream", "downstream"]:
+        if v.lower() in {"upstream", "downstream"}:
+            return v.lower()
+        else:
             raise ConfigurationError(
                 "glue_s3_lineage_direction must be either upstream or downstream"
             )
-        return v.lower()
 
     @validator("underlying_platform")
     def underlying_platform_validator(cls, v: str) -> str:
@@ -291,7 +292,6 @@ class GlueSource(Source):
                     platform_instance=self.source_config.platform_instance,
                 )
 
-            # if data object is S3 bucket
             elif node_args.get("connection_type") == "s3":
 
                 s3_uri = self.get_s3_uri(node_args)
@@ -304,15 +304,14 @@ class GlueSource(Source):
                     return None
 
                 # append S3 format if different ones exist
-                if len(s3_formats[s3_uri]) > 1:
-                    node_urn = make_s3_urn(
+                node_urn = (
+                    make_s3_urn(
                         f"{s3_uri}.{node_args.get('format')}",
                         self.env,
                     )
-
-                else:
-                    node_urn = make_s3_urn(s3_uri, self.env)
-
+                    if len(s3_formats[s3_uri]) > 1
+                    else make_s3_urn(s3_uri, self.env)
+                )
                 dataset_snapshot = DatasetSnapshot(
                     urn=node_urn,
                     aspects=[],
@@ -331,20 +330,17 @@ class GlueSource(Source):
                 )
                 new_dataset_ids.append(f"{node['NodeType']}-{node['Id']}")
 
+            elif self.source_config.ignore_unsupported_connectors:
+
+                logger.info(
+                    flow_urn,
+                    f"Unrecognized Glue data object type: {node_args}. Skipping.",
+                )
+
             else:
 
-                if self.source_config.ignore_unsupported_connectors:
+                raise ValueError(f"Unrecognized Glue data object type: {node_args}")
 
-                    logger.info(
-                        flow_urn,
-                        f"Unrecognized Glue data object type: {node_args}. Skipping.",
-                    )
-
-                else:
-
-                    raise ValueError(f"Unrecognized Glue data object type: {node_args}")
-
-        # otherwise, a node represents a transformation
         else:
             node_urn = mce_builder.make_data_job_urn_with_flow(
                 flow_urn, job_id=f'{node["NodeType"]}-{node["Id"]}'
@@ -568,14 +564,13 @@ class GlueSource(Source):
                                 )
                             ]
                         )
-                        mcp = MetadataChangeProposalWrapper(
+                        return MetadataChangeProposalWrapper(
                             entityType="dataset",
                             entityUrn=mce.proposedSnapshot.urn,
                             changeType=ChangeTypeClass.UPSERT,
                             aspectName="upstreamLineage",
                             aspect=upstream_lineage,
                         )
-                        return mcp
                     else:
                         # Need to mint the s3 dataset with upstream lineage from it to glue
                         upstream_lineage = UpstreamLineageClass(
@@ -586,14 +581,13 @@ class GlueSource(Source):
                                 )
                             ]
                         )
-                        mcp = MetadataChangeProposalWrapper(
+                        return MetadataChangeProposalWrapper(
                             entityType="dataset",
                             entityUrn=s3_dataset_urn,
                             changeType=ChangeTypeClass.UPSERT,
                             aspectName="upstreamLineage",
                             aspect=upstream_lineage,
                         )
-                        return mcp
         return None
 
     def gen_database_key(self, database: str) -> DatabaseKey:
@@ -633,18 +627,20 @@ class GlueSource(Source):
             yield wu
 
     def _gen_domain_urn(self, dataset_name: str) -> Optional[str]:
-        for domain, pattern in self.source_config.domain.items():
-            if pattern.allowed(dataset_name):
-                return make_domain_urn(domain)
-
-        return None
+        return next(
+            (
+                make_domain_urn(domain)
+                for domain, pattern in self.source_config.domain.items()
+                if pattern.allowed(dataset_name)
+            ),
+            None,
+        )
 
     def _get_domain_wu(
         self, dataset_name: str, entity_urn: str, entity_type: str
     ) -> Iterable[MetadataWorkUnit]:
 
-        domain_urn = self._gen_domain_urn(dataset_name)
-        if domain_urn:
+        if domain_urn := self._gen_domain_urn(dataset_name):
             wus = add_domain_to_entity_wu(
                 entity_type=entity_type,
                 entity_urn=entity_urn,
@@ -691,8 +687,7 @@ class GlueSource(Source):
             yield from self.add_table_to_database_container(
                 dataset_urn=dataset_urn, db_name=database_name
             )
-            mcp = self.get_lineage_if_enabled(mce)
-            if mcp:
+            if mcp := self.get_lineage_if_enabled(mce):
                 mcp_wu = MetadataWorkUnit(
                     id=f"{full_table_name}-upstreamLineage", mcp=mcp
                 )

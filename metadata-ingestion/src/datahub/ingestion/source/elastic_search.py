@@ -117,7 +117,7 @@ class ElasticToSchemaFieldConverter:
             if elastic_type is not None:
                 self._prefix_name_stack.append(f"[type={elastic_type}].{columnName}")
                 schema_field_data_type = self.get_column_type(elastic_type)
-                schema_field = SchemaField(
+                yield SchemaField(
                     fieldPath=self._get_cur_field_path(),
                     nativeDataType=elastic_type,
                     type=schema_field_data_type,
@@ -125,7 +125,6 @@ class ElasticToSchemaFieldConverter:
                     nullable=True,
                     recursive=False,
                 )
-                yield schema_field
                 self._prefix_name_stack.pop()
             elif nested_props:
                 self._prefix_name_stack.append(f"[type={columnName}]")
@@ -144,12 +143,12 @@ class ElasticToSchemaFieldConverter:
         cls, elastic_mappings: Dict[str, Any]
     ) -> Generator[SchemaField, None, None]:
         converter = cls()
-        properties = elastic_mappings.get("properties")
-        if not properties:
+        if properties := elastic_mappings.get("properties"):
+            yield from converter._get_schema_fields(properties)
+        else:
             raise ValueError(
                 f"Missing 'properties' in elastic search mappings={json.dumps(elastic_mappings)}!"
             )
-        yield from converter._get_schema_fields(properties)
 
 
 @dataclass
@@ -203,9 +202,7 @@ class ElasticsearchSourceConfig(DatasetSourceConfigBase):
 
     @property
     def http_auth(self) -> Optional[Tuple[str, str]]:
-        if self.username is None:
-            return None
-        return self.username, self.password or ""
+        return None if self.username is None else (self.username, self.password or "")
 
 
 class ElasticsearchSource(Source):
@@ -330,14 +327,12 @@ class ElasticsearchSource(Source):
             entityUrn=dataset_urn,
             aspectName="subTypes",
             aspect=SubTypesClass(
-                typeNames=["Index" if not data_stream else "DataStream"]
+                typeNames=["DataStream" if data_stream else "Index"]
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
 
-        # 4. Construct and emit properties if needed
-        index_aliases = raw_index_metadata.get("aliases", {}).keys()
-        if index_aliases:
+        if index_aliases := raw_index_metadata.get("aliases", {}).keys():
             yield MetadataChangeProposalWrapper(
                 entityType="dataset",
                 entityUrn=dataset_urn,

@@ -36,9 +36,7 @@ class PostgresConfig(BasicSQLAlchemyConfig):
         regular = f"{schema}.{table}"
         if self.database_alias:
             return f"{self.database_alias}.{regular}"
-        if self.database:
-            return f"{self.database}.{regular}"
-        return regular
+        return f"{self.database}.{regular}" if self.database else regular
 
 
 class PostgresSource(SQLAlchemySource):

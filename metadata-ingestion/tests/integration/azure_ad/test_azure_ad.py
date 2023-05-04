@@ -276,9 +276,9 @@ def mocked_functions(
     users, groups, nested_group, nested_group_members = load_test_resources(
         test_resources_dir
     )
-    mock_users.return_value = iter(list([users]))
+    mock_users.return_value = iter([users])
     mock_groups.return_value = (
-        iter(list([nested_group])) if return_nested_group else iter(list([groups]))
+        iter([nested_group]) if return_nested_group else iter([groups])
     )
 
     # For simplicity, each user is placed in ALL groups.

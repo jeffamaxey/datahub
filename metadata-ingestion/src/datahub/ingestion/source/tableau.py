@@ -315,9 +315,7 @@ class TableauSource(Source):
 
     def emit_custom_sql_datasources(self) -> Iterable[MetadataWorkUnit]:
         count_on_query = len(self.custom_sql_ids_being_used)
-        custom_sql_filter = "idWithin: {}".format(
-            json.dumps(self.custom_sql_ids_being_used)
-        )
+        custom_sql_filter = f"idWithin: {json.dumps(self.custom_sql_ids_being_used)}"
         custom_sql_connection, total_count, has_next_page = self.get_connection_object(
             custom_sql_graphql_query, "customSQLTablesConnection", custom_sql_filter
         )
@@ -402,8 +400,6 @@ class TableauSource(Source):
     ) -> Optional[SchemaMetadata]:
         schema_metadata = None
         for field in columns:
-            # Datasource fields
-            fields = []
             nativeDataType = field.get("remoteType", "UNKNOWN")
             TypeClass = FIELD_TYPE_MAPPING.get(nativeDataType, NullTypeClass)
             schema_field = SchemaField(
@@ -412,8 +408,7 @@ class TableauSource(Source):
                 nativeDataType=nativeDataType,
                 description=field.get("description", ""),
             )
-            fields.append(schema_field)
-
+            fields = [schema_field]
             schema_metadata = SchemaMetadata(
                 schemaName="test",
                 platform=f"urn:li:dataPlatform:{self.platform}",
@@ -457,12 +452,11 @@ class TableauSource(Source):
                 if datasource.get("id", "") in used_datasources:
                     continue
                 used_datasources.append(datasource.get("id", ""))
-                upstream_tables = self._create_upstream_table_lineage(
+                if upstream_tables := self._create_upstream_table_lineage(
                     datasource,
                     datasource.get("workbook", {}).get("projectName", ""),
                     True,
-                )
-                if upstream_tables:
+                ):
                     upstream_lineage = UpstreamLineage(upstreams=upstream_tables)
                     yield self.get_metadata_change_proposal(
                         csql_urn,
@@ -474,7 +468,6 @@ class TableauSource(Source):
         self, datasource_fields: List[dict]
     ) -> Optional[SchemaMetadata]:
         fields = []
-        schema_metadata = None
         for field in datasource_fields:
             # check datasource - custom sql relations from a field being referenced
             self._track_custom_sql_ids(field)
@@ -501,8 +494,8 @@ class TableauSource(Source):
             )
             fields.append(schema_field)
 
-        if fields:
-            schema_metadata = SchemaMetadata(
+        return (
+            SchemaMetadata(
                 schemaName="test",
                 platform=f"urn:li:dataPlatform:{self.platform}",
                 version=0,
@@ -510,8 +503,9 @@ class TableauSource(Source):
                 hash="",
                 platformSchema=OtherSchema(rawSchema=""),
             )
-
-        return schema_metadata
+            if fields
+            else None
+        )
 
     def get_metadata_change_event(
         self, snap_shot: Union["DatasetSnapshot", "DashboardSnapshot", "ChartSnapshot"]
@@ -605,10 +599,9 @@ class TableauSource(Source):
 
         # Upstream Tables
         if datasource.get("upstreamTables") is not None:
-            # datasource -> db table relations
-            upstream_tables = self._create_upstream_table_lineage(datasource, project)
-
-            if upstream_tables:
+            if upstream_tables := self._create_upstream_table_lineage(
+                datasource, project
+            ):
                 upstream_lineage = UpstreamLineage(upstreams=upstream_tables)
                 yield self.get_metadata_change_proposal(
                     datasource_urn,
@@ -637,9 +630,7 @@ class TableauSource(Source):
 
     def emit_published_datasources(self) -> Iterable[MetadataWorkUnit]:
         count_on_query = len(self.datasource_ids_being_used)
-        datasource_filter = "idWithin: {}".format(
-            json.dumps(self.datasource_ids_being_used)
-        )
+        datasource_filter = f"idWithin: {json.dumps(self.datasource_ids_being_used)}"
         (
             published_datasource_conn,
             total_count,
@@ -948,7 +939,7 @@ class TableauSource(Source):
     def _extract_schema_from_fullName(self, fullName: str) -> str:
         # fullName is observed to be in format [schemaName].[tableName]
         # OR simply tableName OR [tableName]
-        if fullName.startswith("[") and fullName.find("].[") >= 0:
+        if fullName.startswith("[") and "].[" in fullName:
             return fullName[1 : fullName.index("]")]
         return ""
 

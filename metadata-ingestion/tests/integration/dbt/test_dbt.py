@@ -268,22 +268,22 @@ def get_current_checkpoint_from_pipeline(
 def test_dbt_stateful(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
     test_resources_dir = pytestconfig.rootpath / "tests/integration/dbt"
 
-    manifest_path = "{}/dbt_manifest.json".format(test_resources_dir)
-    catalog_path = "{}/dbt_catalog.json".format(test_resources_dir)
-    sources_path = "{}/dbt_sources.json".format(test_resources_dir)
+    manifest_path = f"{test_resources_dir}/dbt_manifest.json"
+    catalog_path = f"{test_resources_dir}/dbt_catalog.json"
+    sources_path = f"{test_resources_dir}/dbt_sources.json"
 
-    manifest_path_deleted_actor = "{}/dbt_manifest_deleted_actor.json".format(
-        test_resources_dir
+    manifest_path_deleted_actor = (
+        f"{test_resources_dir}/dbt_manifest_deleted_actor.json"
     )
-    catalog_path_deleted_actor = "{}/dbt_catalog_deleted_actor.json".format(
-        test_resources_dir
+    catalog_path_deleted_actor = (
+        f"{test_resources_dir}/dbt_catalog_deleted_actor.json"
     )
-    sources_path_deleted_actor = "{}/dbt_sources_deleted_actor.json".format(
-        test_resources_dir
+    sources_path_deleted_actor = (
+        f"{test_resources_dir}/dbt_sources_deleted_actor.json"
     )
 
-    deleted_actor_golden_mcs = "{}/dbt_deleted_actor_mces_golden.json".format(
-        test_resources_dir
+    deleted_actor_golden_mcs = (
+        f"{test_resources_dir}/dbt_deleted_actor_mces_golden.json"
     )
 
     stateful_config = {
@@ -335,9 +335,9 @@ def test_dbt_stateful(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
     }
 
     with patch(
-        "datahub.ingestion.source.state_provider.datahub_ingestion_checkpointing_provider.DataHubGraph",
-        mock_datahub_graph,
-    ) as mock_checkpoint:
+            "datahub.ingestion.source.state_provider.datahub_ingestion_checkpointing_provider.DataHubGraph",
+            mock_datahub_graph,
+        ) as mock_checkpoint:
         mock_checkpoint.return_value = mock_datahub_graph
 
         # Do the first run of the pipeline and get the default job's checkpoint.
@@ -350,7 +350,7 @@ def test_dbt_stateful(pytestconfig, tmp_path, mock_time, mock_datahub_graph):
         # Set dbt config where actor table is deleted.
         pipeline_config_dict["source"]["config"] = scd_after_deletion
         # Capture MCEs of second run to validate Status(removed=true)
-        deleted_mces_path = "{}/{}".format(tmp_path, "dbt_deleted_mces.json")
+        deleted_mces_path = f"{tmp_path}/dbt_deleted_mces.json"
         pipeline_config_dict["sink"]["type"] = "file"
         pipeline_config_dict["sink"]["config"] = {"filename": deleted_mces_path}
 

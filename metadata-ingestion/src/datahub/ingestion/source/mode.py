@@ -467,9 +467,8 @@ class ModeSource(Source):
         return source_paths
 
     def _get_datasource_urn(self, platform, platform_instance, database, source_tables):
-        dataset_urn = None
-        if platform or database is not None:
-            dataset_urn = [
+        return (
+            [
                 builder.make_dataset_urn_with_platform_instance(
                     platform,
                     f"{database}.{s_table}",
@@ -478,8 +477,9 @@ class ModeSource(Source):
                 )
                 for s_table in source_tables
             ]
-
-        return dataset_urn
+            if platform or database is not None
+            else None
+        )
 
     def construct_chart_from_api_data(
         self, chart_data: dict, query: dict, path: str

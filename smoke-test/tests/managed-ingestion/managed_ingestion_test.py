@@ -188,7 +188,7 @@ def test_create_list_get_remove_secret(frontend_session):
 
     secret_values = res_data["data"]["getSecretValues"]
     secret_value_arr = [x for x in secret_values if x["name"] == "SMOKE_TEST"]
-    assert len(secret_value_arr) == 0
+    assert not secret_value_arr
 
 @pytest.mark.dependency(depends=["test_healthchecks", "test_run_ingestion"])
 def test_create_list_get_remove_ingestion_source(frontend_session):

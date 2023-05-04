@@ -50,7 +50,7 @@ def modify_docker_config(base_path, docker_yaml_config):
 
             # 4. Create an "environment" block if it does not exist
             if "environment" not in service:
-                service["environment"] = list()
+                service["environment"] = []
 
             # 5. Append to an "environment" block to YAML
             for key, value in env_vars.items():
@@ -73,9 +73,9 @@ def modify_docker_config(base_path, docker_yaml_config):
             for i in range(len(volumes)):
                 ## Quickstart yaml files are located under quickstart. To get correct paths, need to refer to parent directory
                 if volumes[i].startswith("../"):
-                    volumes[i] = "../" + volumes[i]
+                    volumes[i] = f"../{volumes[i]}"
                 elif volumes[i].startswith("./"):
-                    volumes[i] = "." + volumes[i]
+                    volumes[i] = f".{volumes[i]}"
 
     # 9. Set docker compose version to 2.
     # We need at least this version, since we use features like start_period for

@@ -188,20 +188,17 @@ def _get_all_relation_info(self, connection, **kw):
             )
         )
     )
-    relations = {}
-    for rel in result:
-        relations[(rel.database, rel.relname)] = rel
-    return relations
+    return {(rel.database, rel.relname): rel for rel in result}
 
 
 def _get_table_or_view_names(self, relkind, connection, schema=None, **kw):
     info_cache = kw.get("info_cache")
     all_relations = self._get_all_relation_info(connection, info_cache=info_cache)
-    relation_names = []
-    for key, relation in all_relations.items():
-        if relation.database == schema and relation.relkind == relkind:
-            relation_names.append(relation.relname)
-    return relation_names
+    return [
+        relation.relname
+        for key, relation in all_relations.items()
+        if relation.database == schema and relation.relkind == relkind
+    ]
 
 
 @reflection.cache  # type: ignore
@@ -265,20 +262,19 @@ def _get_column_info(self, name, format_type, comment):
         col_type = col_type.nested_type
         nullable = True
 
-    result = {
+    return {
         "name": name,
         "type": col_type,
         "nullable": nullable,
         "comment": comment,
         "full_type": format_type,
     }
-    return result
 
 
 @reflection.cache  # type: ignore
 def get_columns(self, connection, table_name, schema=None, **kw):
     if not schema:
-        query = "DESCRIBE TABLE {}".format(self._quote_table_name(table_name))
+        query = f"DESCRIBE TABLE {self._quote_table_name(table_name)}"
         cols = self._execute(connection, query)
     else:
         cols = self._get_clickhouse_columns(connection, table_name, schema, **kw)
@@ -383,15 +379,13 @@ class ClickHouseSource(SQLAlchemySource):
          WHERE name NOT LIKE '.inner%'"""
         )
 
-        all_tables_set = set()
-
         url = self.config.get_sql_alchemy_url()
         logger.debug(f"sql_alchemy_url={url}")
         engine = create_engine(url, **self.config.options)
-        for db_row in engine.execute(text(all_tables_query)):
-            all_tables_set.add(f'{db_row["database"]}.{db_row["table_name"]}')
-
-        return all_tables_set
+        return {
+            f'{db_row["database"]}.{db_row["table_name"]}'
+            for db_row in engine.execute(text(all_tables_query))
+        }
 
     def _populate_lineage_map(
         self, query: str, lineage_type: LineageCollectorType
@@ -425,10 +419,7 @@ class ClickHouseSource(SQLAlchemySource):
                     continue
 
                 # Target
-                target_path = (
-                    f'{self.config.platform_instance+"." if self.config.platform_instance else ""}'
-                    f'{db_row["target_schema"]}.{db_row["target_table"]}'
-                )
+                target_path = f'{f"{self.config.platform_instance}." if self.config.platform_instance else ""}{db_row["target_schema"]}.{db_row["target_table"]}'
                 target = LineageItem(
                     dataset=LineageDataset(
                         platform=LineageDatasetPlatform.CLICKHOUSE, path=target_path

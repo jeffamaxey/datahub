@@ -56,10 +56,9 @@ class AddCustomOwnership(BaseTransformer, SingleAspectTransformer):
         self, entity_urn: str, aspect_name: str, aspect: Optional[OwnershipClass]
     ) -> Optional[OwnershipClass]:
 
-        owners_to_add = self.owners
         assert aspect is None or isinstance(aspect, OwnershipClass)
 
-        if owners_to_add:
+        if owners_to_add := self.owners:
             ownership = (
                 aspect
                 if aspect

@@ -59,9 +59,7 @@ class DatahubIngestionCheckpointingProvider(IngestionCheckpointingProviderBase):
 
     def _is_server_stateful_ingestion_capable(self) -> bool:
         server_config = self.graph.get_config() if self.graph else None
-        if server_config and server_config.get("statefulIngestionCapable"):
-            return True
-        return False
+        return bool(server_config and server_config.get("statefulIngestionCapable"))
 
     def get_latest_checkpoint(
         self,
@@ -78,9 +76,7 @@ class DatahubIngestionCheckpointingProvider(IngestionCheckpointingProviderBase):
         data_job_urn = self.get_data_job_urn(
             self.orchestrator_name, pipeline_name, job_name, platform_instance_id
         )
-        latest_checkpoint: Optional[
-            DatahubIngestionCheckpointClass
-        ] = self.graph.get_latest_timeseries_value(
+        if latest_checkpoint := self.graph.get_latest_timeseries_value(
             entity_urn=data_job_urn,
             aspect_name="datahubIngestionCheckpoint",
             filter_criteria_map={
@@ -88,8 +84,7 @@ class DatahubIngestionCheckpointingProvider(IngestionCheckpointingProviderBase):
                 "platformInstanceId": platform_instance_id,
             },
             aspect_type=DatahubIngestionCheckpointClass,
-        )
-        if latest_checkpoint:
+        ):
             logger.info(
                 f"The last committed ingestion checkpoint for pipelineName:'{pipeline_name}',"
                 f" platformInstanceId:'{platform_instance_id}', job_name:'{job_name}' found with start_time:"

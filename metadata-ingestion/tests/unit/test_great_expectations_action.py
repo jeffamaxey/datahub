@@ -51,7 +51,7 @@ def ge_data_context(tmp_path: str) -> DataContext:
 
 @pytest.fixture(scope="function")
 def ge_validator_sqlalchemy() -> Validator:
-    validator = Validator(
+    return Validator(
         execution_engine=SqlAlchemyExecutionEngine(
             connection_string="postgresql://localhost:5432/test"
         ),
@@ -81,18 +81,16 @@ def ge_validator_sqlalchemy() -> Validator:
             )
         ],
     )
-    return validator
 
 
 @pytest.fixture(scope="function")
 def ge_validator_pandas() -> Validator:
-    validator = Validator(execution_engine=PandasExecutionEngine())
-    return validator
+    return Validator(execution_engine=PandasExecutionEngine())
 
 
 @pytest.fixture(scope="function")
 def ge_validation_result_suite() -> ExpectationSuiteValidationResult:
-    validation_result_suite = ExpectationSuiteValidationResult(
+    return ExpectationSuiteValidationResult(
         results=[
             {
                 "success": True,
@@ -124,21 +122,20 @@ def ge_validation_result_suite() -> ExpectationSuiteValidationResult:
             "validation_time": "20211228T120000.000000Z",
         },
     )
-    return validation_result_suite
 
 
 @pytest.fixture(scope="function")
 def ge_validation_result_suite_id() -> ValidationResultIdentifier:
-    validation_result_suite_id = ValidationResultIdentifier(
-        expectation_suite_identifier=ExpectationSuiteIdentifier("asset.default"),
+    return ValidationResultIdentifier(
+        expectation_suite_identifier=ExpectationSuiteIdentifier(
+            "asset.default"
+        ),
         run_id=RunIdentifier(
             run_name="test_100",
             run_time=datetime.fromtimestamp(1640701702, tz=timezone.utc),
         ),
         batch_identifier="010ef8c1cd417910b971f4468f024ec5",
     )
-
-    return validation_result_suite_id
 
 
 @mock.patch("datahub.emitter.rest_emitter.DatahubRestEmitter.emit_mcp", autospec=True)

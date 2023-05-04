@@ -51,7 +51,5 @@ def delete_urns_from_file(filename: str) -> None:
             payload_obj = {"urn": urn}
 
             cli_utils.post_delete_endpoint_with_session_and_url(
-                session,
-                GMS_ENDPOINT + "/entities?action=delete",
-                payload_obj,
+                session, f"{GMS_ENDPOINT}/entities?action=delete", payload_obj
             )

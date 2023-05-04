@@ -111,8 +111,8 @@ class PathSpec(ConfigModel):
             logger.debug(
                 f"table_name fields: {parse.compile(values['table_name']).named_fields}"
             )
-            if not all(
-                x in values["_compiled_include"].named_fields
+            if any(
+                x not in values["_compiled_include"].named_fields
                 for x in parse.compile(values["table_name"]).named_fields
             ):
                 raise ValueError(
@@ -152,17 +152,13 @@ class DataLakeSourceConfig(ConfigModel):
         value = values.get("platform")
         if value is not None and value != "":
             return values
-        if values.get("path_spec") is not None and isinstance(
+        if values.get("path_spec") is None or not isinstance(
             values.get("path_spec"), PathSpec
         ):
-            if values["path_spec"].is_s3():
-                values["platform"] = "s3"
-            else:
-                values["platform"] = "file"
-            logger.debug(f'Setting config "platform": {values.get("platform")}')
-            return values
-        else:
             raise ValueError("path_spec is not valid. Cannot autodetect platform")
+        values["platform"] = "s3" if values["path_spec"].is_s3() else "file"
+        logger.debug(f'Setting config "platform": {values.get("platform")}')
+        return values
 
     @pydantic.root_validator()
     def ensure_profiling_pattern_is_passed_to_profiling(

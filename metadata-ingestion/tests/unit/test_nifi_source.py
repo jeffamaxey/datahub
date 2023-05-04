@@ -163,114 +163,114 @@ def test_nifi_s3_provenance_event():
 
 def mocked_functions(mock_provenance_events, mock_delete_provenance, provenance_case):
 
-    puts3_provenance_response = [
-        {
-            "id": "49",
-            "eventId": 49,
-            "eventTime": "12/08/2021 10:06:39.938 UTC",
-            "eventType": "SEND",
-            "flowFileUuid": "0b205834-5cac-4979-ad7a-e3db1cb17685",
-            "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
-            "componentId": "aed63edf-e660-3f29-b56b-192cf6286889",
-            "componentType": "PutS3Object",
-            "componentName": "PutS3Object",
-            "attributes": [
-                {
-                    "name": "filename",
-                    "value": "test_rare.json",
-                    "previousValue": "test_rare.json",
-                },
-                {"name": "path", "value": "./", "previousValue": "./"},
-                {
-                    "name": "s3.bucket",
-                    "value": "foo-nifi",
-                    "previousValue": "enriched-topical-chat",
-                },
-                {"name": "s3.key", "value": "tropical_data/test_rare.json"},
-            ],
-            "transitUri": "https://foo-nifi.s3.amazonaws.com/tropical_data/test_rare.json",
-        },
-        {
-            "id": "46",
-            "eventId": 46,
-            "eventTime": "12/08/2021 10:06:30.560 UTC",
-            "eventType": "SEND",
-            "flowFileUuid": "e8a6ad9a-1d02-4bf1-b104-dad1ff180ddd",
-            "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
-            "componentId": "aed63edf-e660-3f29-b56b-192cf6286889",
-            "componentType": "PutS3Object",
-            "componentName": "PutS3Object",
-            "attributes": [
-                {
-                    "name": "filename",
-                    "value": "test_freq.json",
-                    "previousValue": "test_freq.json",
-                },
-                {"name": "path", "value": "./", "previousValue": "./"},
-                {
-                    "name": "s3.bucket",
-                    "value": "foo-nifi",
-                    "previousValue": "enriched-topical-chat",
-                },
-                {"name": "s3.key", "value": "tropical_data/test_freq.json"},
-            ],
-            "transitUri": "https://foo-nifi.s3.amazonaws.com/tropical_data/test_freq.json",
-        },
-    ]
-
-    fetchs3_provenance_response = [
-        {
-            "id": "44",
-            "eventId": 44,
-            "eventTime": "12/08/2021 10:06:19.828 UTC",
-            "eventType": "FETCH",
-            "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
-            "componentId": "91d59f03-1c2b-3f3f-48bc-f89296a328bd",
-            "componentType": "FetchS3Object",
-            "componentName": "FetchS3Object",
-            "attributes": [
-                {
-                    "name": "filename",
-                    "value": "test_rare.json",
-                    "previousValue": "test_rare.json",
-                },
-                {"name": "path", "value": "./", "previousValue": "./"},
-                {
-                    "name": "s3.bucket",
-                    "value": "enriched-topical-chat",
-                    "previousValue": "enriched-topical-chat",
-                },
-            ],
-            "transitUri": "http://enriched-topical-chat.amazonaws.com/test_rare.json",
-        },
-        {
-            "id": "42",
-            "eventId": 42,
-            "eventTime": "12/08/2021 10:06:16.952 UTC",
-            "eventType": "FETCH",
-            "flowFileUuid": "e8a6ad9a-1d02-4bf1-b104-dad1ff180ddd",
-            "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
-            "componentId": "91d59f03-1c2b-3f3f-48bc-f89296a328bd",
-            "componentType": "FetchS3Object",
-            "componentName": "FetchS3Object",
-            "attributes": [
-                {
-                    "name": "filename",
-                    "value": "test_freq.json",
-                    "previousValue": "test_freq.json",
-                },
-                {"name": "path", "value": "./", "previousValue": "./"},
-                {
-                    "name": "s3.bucket",
-                    "value": "enriched-topical-chat",
-                    "previousValue": "enriched-topical-chat",
-                },
-            ],
-            "transitUri": "http://enriched-topical-chat.amazonaws.com/test_freq.json",
-        },
-    ]
     mock_delete_provenance.return_value = None
     if provenance_case == "fetchs3":
+        fetchs3_provenance_response = [
+            {
+                "id": "44",
+                "eventId": 44,
+                "eventTime": "12/08/2021 10:06:19.828 UTC",
+                "eventType": "FETCH",
+                "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
+                "componentId": "91d59f03-1c2b-3f3f-48bc-f89296a328bd",
+                "componentType": "FetchS3Object",
+                "componentName": "FetchS3Object",
+                "attributes": [
+                    {
+                        "name": "filename",
+                        "value": "test_rare.json",
+                        "previousValue": "test_rare.json",
+                    },
+                    {"name": "path", "value": "./", "previousValue": "./"},
+                    {
+                        "name": "s3.bucket",
+                        "value": "enriched-topical-chat",
+                        "previousValue": "enriched-topical-chat",
+                    },
+                ],
+                "transitUri": "http://enriched-topical-chat.amazonaws.com/test_rare.json",
+            },
+            {
+                "id": "42",
+                "eventId": 42,
+                "eventTime": "12/08/2021 10:06:16.952 UTC",
+                "eventType": "FETCH",
+                "flowFileUuid": "e8a6ad9a-1d02-4bf1-b104-dad1ff180ddd",
+                "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
+                "componentId": "91d59f03-1c2b-3f3f-48bc-f89296a328bd",
+                "componentType": "FetchS3Object",
+                "componentName": "FetchS3Object",
+                "attributes": [
+                    {
+                        "name": "filename",
+                        "value": "test_freq.json",
+                        "previousValue": "test_freq.json",
+                    },
+                    {"name": "path", "value": "./", "previousValue": "./"},
+                    {
+                        "name": "s3.bucket",
+                        "value": "enriched-topical-chat",
+                        "previousValue": "enriched-topical-chat",
+                    },
+                ],
+                "transitUri": "http://enriched-topical-chat.amazonaws.com/test_freq.json",
+            },
+        ]
         mock_provenance_events.return_value = fetchs3_provenance_response
     else:
+        puts3_provenance_response = [
+            {
+                "id": "49",
+                "eventId": 49,
+                "eventTime": "12/08/2021 10:06:39.938 UTC",
+                "eventType": "SEND",
+                "flowFileUuid": "0b205834-5cac-4979-ad7a-e3db1cb17685",
+                "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
+                "componentId": "aed63edf-e660-3f29-b56b-192cf6286889",
+                "componentType": "PutS3Object",
+                "componentName": "PutS3Object",
+                "attributes": [
+                    {
+                        "name": "filename",
+                        "value": "test_rare.json",
+                        "previousValue": "test_rare.json",
+                    },
+                    {"name": "path", "value": "./", "previousValue": "./"},
+                    {
+                        "name": "s3.bucket",
+                        "value": "foo-nifi",
+                        "previousValue": "enriched-topical-chat",
+                    },
+                    {"name": "s3.key", "value": "tropical_data/test_rare.json"},
+                ],
+                "transitUri": "https://foo-nifi.s3.amazonaws.com/tropical_data/test_rare.json",
+            },
+            {
+                "id": "46",
+                "eventId": 46,
+                "eventTime": "12/08/2021 10:06:30.560 UTC",
+                "eventType": "SEND",
+                "flowFileUuid": "e8a6ad9a-1d02-4bf1-b104-dad1ff180ddd",
+                "groupId": "80404c81-017d-1000-e8e8-af7420af06c1",
+                "componentId": "aed63edf-e660-3f29-b56b-192cf6286889",
+                "componentType": "PutS3Object",
+                "componentName": "PutS3Object",
+                "attributes": [
+                    {
+                        "name": "filename",
+                        "value": "test_freq.json",
+                        "previousValue": "test_freq.json",
+                    },
+                    {"name": "path", "value": "./", "previousValue": "./"},
+                    {
+                        "name": "s3.bucket",
+                        "value": "foo-nifi",
+                        "previousValue": "enriched-topical-chat",
+                    },
+                    {"name": "s3.key", "value": "tropical_data/test_freq.json"},
+                ],
+                "transitUri": "https://foo-nifi.s3.amazonaws.com/tropical_data/test_freq.json",
+            },
+        ]
+
         mock_provenance_events.return_value = puts3_provenance_response

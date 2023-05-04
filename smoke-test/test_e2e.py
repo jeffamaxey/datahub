@@ -718,7 +718,7 @@ def test_frontend_delete_policy(frontend_session):
         lambda x: x["urn"] == "urn:li:dataHubPolicy:7",
         res_data["data"]["listPolicies"]["policies"],
     )
-    assert len(list(result)) == 0
+    assert not list(result)
 
 
 @pytest.mark.dependency(

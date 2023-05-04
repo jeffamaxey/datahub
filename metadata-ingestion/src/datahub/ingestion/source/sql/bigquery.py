@@ -247,7 +247,7 @@ class BigQuerySource(SQLAlchemySource):
         self.ctx = ctx
         self.report: BigQueryReport = BigQueryReport()
         self.lineage_metadata: Optional[Dict[str, Set[str]]] = None
-        self.maximum_shard_ids: Dict[str, str] = dict()
+        self.maximum_shard_ids: Dict[str, str] = {}
 
     def get_db_name(self, inspector: Inspector = None) -> str:
         if self.config.project_id:
@@ -564,18 +564,12 @@ class BigQuerySource(SQLAlchemySource):
                 project_id=self.get_db_name(inspector), schema=schema, table=table
             )
             result = con.execute(sql)
-            # Bigquery only supports one partition column
-            # https://stackoverflow.com/questions/62886213/adding-multiple-partitioned-columns-to-bigquery-table-from-sql-query
-            row = result.fetchone()
-            if row:
-                return BigQueryPartitionColumn(**row)
-            return None
+            return BigQueryPartitionColumn(**row) if (row := result.fetchone()) else None
 
     def get_shard_from_table(self, table: str) -> Tuple[str, Optional[str]]:
-        match = re.search(SHARDED_TABLE_REGEX, table, re.IGNORECASE)
-        if match:
-            table_name = match.group(1)
-            shard = match.group(2)
+        if match := re.search(SHARDED_TABLE_REGEX, table, re.IGNORECASE):
+            table_name = match[1]
+            shard = match[2]
             return table_name, shard
         return table, None
 
@@ -619,8 +613,7 @@ class BigQuerySource(SQLAlchemySource):
         See more about partitioned tables at https://cloud.google.com/bigquery/docs/partitioned-tables
         """
 
-        partition = self.get_latest_partition(schema, table)
-        if partition:
+        if partition := self.get_latest_partition(schema, table):
             partition_ts: Union[datetime.datetime, datetime.date]
             if not partition_datetime:
                 partition_datetime = parser.parse(partition.partition_id)
@@ -728,7 +721,7 @@ WHERE
     ) -> Set[BigQueryTableRef]:
         upstreams: Set[BigQueryTableRef] = set()
         assert self.lineage_metadata
-        for ref_table in self.lineage_metadata[str(bq_table)]:
+        for ref_table in self.lineage_metadata[bq_table]:
             upstream_table = BigQueryTableRef.from_string_name(ref_table)
             if upstream_table.is_temporary_table():
                 # making sure we don't process a table twice and not get into a recursive loop
@@ -780,14 +773,13 @@ WHERE
 
             if upstream_list:
                 upstream_lineage = UpstreamLineageClass(upstreams=upstream_list)
-                mcp = MetadataChangeProposalWrapper(
+                return MetadataChangeProposalWrapper(
                     entityType="dataset",
                     changeType=ChangeTypeClass.UPSERT,
                     entityUrn=dataset_urn,
                     aspectName="upstreamLineage",
                     aspect=upstream_lineage,
                 )
-                return mcp
         return None
 
     def prepare_profiler_args(
@@ -808,8 +800,7 @@ WHERE
     @functools.lru_cache()
     def _get_project_id(inspector: Inspector) -> str:
         with inspector.bind.connect() as connection:
-            project_id = connection.connection._client.project
-            return project_id
+            return connection.connection._client.project
 
     def normalise_dataset_name(self, dataset_name: str) -> str:
         (project_id, schema, table) = dataset_name.split(".")

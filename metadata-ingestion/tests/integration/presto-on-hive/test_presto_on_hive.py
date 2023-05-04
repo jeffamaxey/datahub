@@ -149,9 +149,7 @@ def test_presto_on_hive_instance_ingest(
     pipeline.raise_from_status(raise_warnings=True)
 
     # Assert that all events generated have instance specific urns
-    urn_pattern = "^" + re.escape(
-        f"urn:li:dataset:(urn:li:dataPlatform:{platform},{instance}."
-    )
+    urn_pattern = f'^{re.escape(f"urn:li:dataset:(urn:li:dataPlatform:{platform},{instance}.")}'
     assert (
         mce_helpers.assert_mce_entity_urn(
             "ALL",

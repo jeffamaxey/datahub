@@ -122,8 +122,7 @@ class TrinoUsageSource(Source):
     def _make_sql_engine(self) -> Engine:
         url = self.config.get_sql_alchemy_url()
         logger.debug(f"sql_alchemy_url = {url}")
-        engine = create_engine(url, **self.config.options)
-        return engine
+        return create_engine(url, **self.config.options)
 
     def _get_trino_history(self):
         query = self._make_usage_query()
@@ -132,11 +131,7 @@ class TrinoUsageSource(Source):
         events = []
         for row in results:
             # minor type conversion
-            if hasattr(row, "_asdict"):
-                event_dict = row._asdict()
-            else:
-                event_dict = dict(row)
-
+            event_dict = row._asdict() if hasattr(row, "_asdict") else dict(row)
             # stripping extra spaces caused by above _asdict() conversion
             for k, v in event_dict.items():
                 if isinstance(v, str):
@@ -160,8 +155,7 @@ class TrinoUsageSource(Source):
 
     def _convert_str_to_datetime(self, v):
         if isinstance(v, str):
-            isodate = parser.parse(v)  # compatible with Python 3.6+
-            return isodate
+            return parser.parse(v)
 
     def _get_joined_access_event(self, events):
         joined_access_events = []

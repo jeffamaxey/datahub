@@ -70,14 +70,11 @@ def get_metric_name(metric):
     if isinstance(metric, str):
         return metric
     label = metric.get("label")
-    if not label:
-        return ""
-    return label
+    return label if label else ""
 
 
 def get_filter_name(filter_obj):
-    sql_expression = filter_obj.get("sqlExpression")
-    if sql_expression:
+    if sql_expression := filter_obj.get("sqlExpression"):
         return sql_expression
 
     clause = filter_obj.get("clause")
@@ -124,8 +121,6 @@ class SupersetSource(Source):
 
         # Test the connection
         test_response = self.session.get(f"{self.config.connect_uri}/api/v1/database")
-        if test_response.status_code == 200:
-            pass
             # TODO(Gabe): how should we message about this error?
 
     @classmethod
@@ -157,13 +152,7 @@ class SupersetSource(Source):
         if database_id and table_name:
             platform = self.get_platform_from_database_id(database_id)
             platform_urn = f"urn:li:dataPlatform:{platform}"
-            dataset_urn = (
-                f"urn:li:dataset:("
-                f"{platform_urn},{database_name + '.' if database_name else ''}"
-                f"{schema_name + '.' if schema_name else ''}"
-                f"{table_name},{self.config.env})"
-            )
-            return dataset_urn
+            return f"urn:li:dataset:({platform_urn},{f'{database_name}.' if database_name else ''}{f'{schema_name}.' if schema_name else ''}{table_name},{self.config.env})"
         return None
 
     def construct_dashboard_from_api_data(self, dashboard_data):
@@ -192,13 +181,11 @@ class SupersetSource(Source):
         position_data = (
             json.loads(raw_position_data) if raw_position_data is not None else {}
         )
-        for key, value in position_data.items():
-            if not key.startswith("CHART-"):
-                continue
-            chart_urns.append(
-                f"urn:li:chart:({self.platform},{value.get('meta', {}).get('chartId', 'unknown')})"
-            )
-
+        chart_urns.extend(
+            f"urn:li:chart:({self.platform},{value.get('meta', {}).get('chartId', 'unknown')})"
+            for key, value in position_data.items()
+            if key.startswith("CHART-")
+        )
         dashboard_info = DashboardInfoClass(
             description="",
             title=title,

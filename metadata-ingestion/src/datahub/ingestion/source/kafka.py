@@ -54,13 +54,15 @@ class KafkaSourceStatefulIngestionConfig(StatefulIngestionConfig):
     remove_stale_metadata: bool = True
 
 
+
+
 class KafkaSourceConfig(StatefulIngestionConfigBase, DatasetSourceConfigBase):
     env: str = DEFAULT_ENV
     # TODO: inline the connection config
     connection: KafkaConsumerConnectionConfig = KafkaConsumerConnectionConfig()
     topic_patterns: AllowDenyPattern = AllowDenyPattern(allow=[".*"], deny=["^_.*"])
-    domain: Dict[str, AllowDenyPattern] = dict()
-    topic_subject_map: Dict[str, str] = dict()
+    domain: Dict[str, AllowDenyPattern] = {}
+    topic_subject_map: Dict[str, str] = {}
     # Custom Stateful Ingestion settings
     stateful_ingestion: Optional[KafkaSourceStatefulIngestionConfig] = None
     schema_registry_class: str = (
@@ -129,15 +131,14 @@ class KafkaSource(StatefulIngestionSourceBase):
         )
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
-        if (
-            job_id == self.get_default_ingestion_job_id()
-            and self.is_stateful_ingestion_configured()
-            and self.source_config.stateful_ingestion
-            and self.source_config.stateful_ingestion.remove_stale_metadata
-        ):
-            return True
-
-        return False
+        return bool(
+            (
+                job_id == self.get_default_ingestion_job_id()
+                and self.is_stateful_ingestion_configured()
+                and self.source_config.stateful_ingestion
+                and self.source_config.stateful_ingestion.remove_stale_metadata
+            )
+        )
 
     def get_default_ingestion_job_id(self) -> JobId:
         """

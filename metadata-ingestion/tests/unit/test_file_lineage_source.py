@@ -41,12 +41,11 @@ def basic_mcp():
         """
     config = yaml.safe_load(sample_lineage)
     lineage_config: LineageConfig = LineageConfig.parse_obj(config)
-    mcp = list(
+    return list(
         LineageFileSource.get_lineage_metadata_change_event_proposal(
             entities=lineage_config.lineage, preserve_upstream=False
         )
     )
-    return mcp
 
 
 def unsupported_entity_type_mcp():
@@ -87,12 +86,11 @@ def unsupported_entity_type_mcp():
         """
     config = yaml.safe_load(sample_lineage)
     lineage_config: LineageConfig = LineageConfig.parse_obj(config)
-    mcp = list(
+    return list(
         LineageFileSource.get_lineage_metadata_change_event_proposal(
             entities=lineage_config.lineage, preserve_upstream=False
         )
     )
-    return mcp
 
 
 def unsupported_upstream_entity_type_mcp():
@@ -117,12 +115,11 @@ def unsupported_upstream_entity_type_mcp():
         """
     config = yaml.safe_load(sample_lineage)
     lineage_config: LineageConfig = LineageConfig.parse_obj(config)
-    mcp = list(
+    return list(
         LineageFileSource.get_lineage_metadata_change_event_proposal(
             entities=lineage_config.lineage, preserve_upstream=False
         )
     )
-    return mcp
 
 
 def unsupported_entity_env_mcp():
@@ -163,12 +160,11 @@ def unsupported_entity_env_mcp():
         """
     config = yaml.safe_load(sample_lineage)
     lineage_config: LineageConfig = LineageConfig.parse_obj(config)
-    mcp = list(
+    return list(
         LineageFileSource.get_lineage_metadata_change_event_proposal(
             entities=lineage_config.lineage, preserve_upstream=False
         )
     )
-    return mcp
 
 
 def test_basic_lineage_entity_root_node_urn(basic_mcp):

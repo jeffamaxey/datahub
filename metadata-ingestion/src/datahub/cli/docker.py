@@ -65,11 +65,10 @@ def _print_issue_list_and_exit(
 
 
 def docker_check_impl() -> None:
-    issues = check_local_docker_containers()
-    if not issues:
-        click.secho("✔ No issues detected", fg="green")
-    else:
+    if issues := check_local_docker_containers():
         _print_issue_list_and_exit(issues, "The following issues were detected:")
+    else:
+        click.secho("✔ No issues detected", fg="green")
 
 
 @docker.command()
@@ -184,9 +183,7 @@ def quickstart(
     if running_on_m1:
         click.echo("Detected M1 machine")
 
-    # Run pre-flight checks.
-    issues = check_local_docker_containers(preflight_only=True)
-    if issues:
+    if issues := check_local_docker_containers(preflight_only=True):
         _print_issue_list_and_exit(issues, "Unable to run quickstart:")
 
     quickstart_compose_file = list(
@@ -202,9 +199,9 @@ def quickstart(
         github_file = (
             GITHUB_NEO4J_AND_ELASTIC_QUICKSTART_COMPOSE_URL
             if should_use_neo4j and not running_on_m1
-            else GITHUB_ELASTIC_QUICKSTART_COMPOSE_URL
-            if not running_on_m1
             else GITHUB_M1_QUICKSTART_COMPOSE_URL
+            if running_on_m1
+            else GITHUB_ELASTIC_QUICKSTART_COMPOSE_URL
         )
 
         with tempfile.NamedTemporaryFile(suffix=".yml", delete=False) as tmp_file:
@@ -334,9 +331,7 @@ def ingest_sample_data(path: Optional[str]) -> None:
             tmp_file.write(mce_json_download_response.content)
         click.echo(f"Downloaded to {path}")
 
-    # Verify that docker is up.
-    issues = check_local_docker_containers()
-    if issues:
+    if issues := check_local_docker_containers():
         _print_issue_list_and_exit(
             issues,
             header="Docker is not ready:",

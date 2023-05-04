@@ -11,9 +11,7 @@ def strip_s3_prefix(s3_uri: str) -> str:
     # remove S3 prefix (s3://)
     for s3_prefix in S3_PREFIXES:
         if s3_uri.startswith(s3_prefix):
-            plain_base_path = s3_uri[len(s3_prefix) :]
-            return plain_base_path
-
+            return s3_uri[len(s3_prefix) :]
     raise ValueError(
         f"Not an S3 URI. Must start with one of the following prefixes: {str(S3_PREFIXES)}"
     )

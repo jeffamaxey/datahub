@@ -88,17 +88,17 @@ class AirflowGenerator:
                 if subdag_task_id in upstream_task._downstream_task_ids:
                     upstream_subdag_triggers.append(upstream_task_urn)
 
-        # exclude subdag operator tasks since these are not emitted, resulting in empty metadata
-        upstream_tasks = (
+        return (
             [
-                DataJobUrn.create_from_ids(job_id=task_id, data_flow_urn=str(flow_urn))
+                DataJobUrn.create_from_ids(
+                    job_id=task_id, data_flow_urn=str(flow_urn)
+                )
                 for task_id in task.upstream_task_ids
                 if dag.task_dict[task_id].subdag is None
             ]
             + upstream_subdag_task_urns
             + upstream_subdag_triggers
         )
-        return upstream_tasks
 
     @staticmethod
     def generate_dataflow(
@@ -185,9 +185,15 @@ class AirflowGenerator:
         )
         datajob = DataJob(id=task.task_id, flow_urn=dataflow_urn)
         datajob.description = (
-            (task.doc or task.doc_md or task.doc_json or task.doc_yaml or task.doc_rst)
-            if not AIRFLOW_1
-            else None
+            None
+            if AIRFLOW_1
+            else (
+                task.doc
+                or task.doc_md
+                or task.doc_json
+                or task.doc_yaml
+                or task.doc_rst
+            )
         )
 
         job_property_bag: Dict[str, str] = {
@@ -247,10 +253,12 @@ class AirflowGenerator:
 
         if data_job is None:
             data_job = AirflowGenerator.generate_datajob(cluster, task=task, dag=dag)
-        dpi = DataProcessInstance.from_datajob(
-            datajob=data_job, id=task.task_id, clone_inlets=True, clone_outlets=True
+        return DataProcessInstance.from_datajob(
+            datajob=data_job,
+            id=task.task_id,
+            clone_inlets=True,
+            clone_outlets=True,
         )
-        return dpi
 
     @staticmethod
     def run_dataflow(
@@ -278,21 +286,21 @@ class AirflowGenerator:
                 dpi.type = DataProcessTypeClass.BATCH_SCHEDULED
             elif dag_run.run_type == DagRunType.MANUAL:
                 dpi.type = DataProcessTypeClass.BATCH_AD_HOC
+        elif dag_run.run_id.startswith("scheduled__"):
+            dpi.type = DataProcessTypeClass.BATCH_SCHEDULED
         else:
-            if dag_run.run_id.startswith("scheduled__"):
-                dpi.type = DataProcessTypeClass.BATCH_SCHEDULED
-            else:
-                dpi.type = DataProcessTypeClass.BATCH_AD_HOC
+            dpi.type = DataProcessTypeClass.BATCH_AD_HOC
 
-        property_bag: Dict[str, str] = {}
-        property_bag["run_id"] = str(dag_run.run_id)
-        property_bag["execution_date"] = str(dag_run.execution_date)
-        property_bag["end_date"] = str(dag_run.end_date)
-        property_bag["start_date"] = str(dag_run.start_date)
-        property_bag["creating_job_id"] = str(dag_run.creating_job_id)
-        property_bag["data_interval_start"] = str(dag_run.data_interval_start)
-        property_bag["data_interval_end"] = str(dag_run.data_interval_end)
-        property_bag["external_trigger"] = str(dag_run.external_trigger)
+        property_bag: Dict[str, str] = {
+            "run_id": str(dag_run.run_id),
+            "execution_date": str(dag_run.execution_date),
+            "end_date": str(dag_run.end_date),
+            "start_date": str(dag_run.start_date),
+            "creating_job_id": str(dag_run.creating_job_id),
+            "data_interval_start": str(dag_run.data_interval_start),
+            "data_interval_end": str(dag_run.data_interval_end),
+            "external_trigger": str(dag_run.external_trigger),
+        }
         dpi.properties.update(property_bag)
 
         dpi.emit_process_start(
@@ -365,15 +373,16 @@ class AirflowGenerator:
             clone_inlets=True,
             clone_outlets=True,
         )
-        job_property_bag: Dict[str, str] = {}
-        job_property_bag["run_id"] = str(dag_run.run_id)
-        job_property_bag["duration"] = str(ti.duration)
-        job_property_bag["start_date"] = str(ti.start_date)
-        job_property_bag["end_date"] = str(ti.end_date)
-        job_property_bag["execution_date"] = str(ti.execution_date)
-        job_property_bag["try_number"] = str(ti.try_number - 1)
-        job_property_bag["hostname"] = str(ti.hostname)
-        job_property_bag["max_tries"] = str(ti.max_tries)
+        job_property_bag: Dict[str, str] = {
+            "run_id": str(dag_run.run_id),
+            "duration": str(ti.duration),
+            "start_date": str(ti.start_date),
+            "end_date": str(ti.end_date),
+            "execution_date": str(ti.execution_date),
+            "try_number": str(ti.try_number - 1),
+            "hostname": str(ti.hostname),
+            "max_tries": str(ti.max_tries),
+        }
         # Not compatible with Airflow 1
         if not AIRFLOW_1:
             job_property_bag["external_executor_id"] = str(ti.external_executor_id)
@@ -394,11 +403,10 @@ class AirflowGenerator:
                 dpi.type = DataProcessTypeClass.BATCH_SCHEDULED
             elif ti.dag_run.run_type == DagRunType.MANUAL:
                 dpi.type = DataProcessTypeClass.BATCH_AD_HOC
+        elif dag_run.run_id.startswith("scheduled__"):
+            dpi.type = DataProcessTypeClass.BATCH_SCHEDULED
         else:
-            if dag_run.run_id.startswith("scheduled__"):
-                dpi.type = DataProcessTypeClass.BATCH_SCHEDULED
-            else:
-                dpi.type = DataProcessTypeClass.BATCH_AD_HOC
+            dpi.type = DataProcessTypeClass.BATCH_AD_HOC
 
         if start_timestamp_millis is None:
             assert ti.start_date

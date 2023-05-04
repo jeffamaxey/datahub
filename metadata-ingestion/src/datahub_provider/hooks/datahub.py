@@ -22,9 +22,7 @@ if TYPE_CHECKING:
     from datahub.ingestion.sink.datahub_kafka import KafkaSinkConfig
 
 
-_default_hook_args = []
-if AIRFLOW_1:
-    _default_hook_args = [None]
+_default_hook_args = [None] if AIRFLOW_1 else []
 
 
 class DatahubRestHook(BaseHook):
@@ -139,8 +137,7 @@ class DatahubKafkaHook(BaseHook):
             obj["connection"]["bootstrap"] = ":".join(
                 map(str, filter(None, [conn.host, conn.port]))
             )
-        config = datahub.ingestion.sink.datahub_kafka.KafkaSinkConfig.parse_obj(obj)
-        return config
+        return datahub.ingestion.sink.datahub_kafka.KafkaSinkConfig.parse_obj(obj)
 
     def make_emitter(self) -> "DatahubKafkaEmitter":
         import datahub.emitter.kafka_emitter

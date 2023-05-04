@@ -239,12 +239,7 @@ class ModelProcessor:
             model_endpoints |= self.lineage.model_uri_endpoints[model_uri]
             self.model_uri_to_name[model_uri] = model_details["ModelName"]
 
-        # sort endpoints and groups for consistency
-        model_endpoints_sorted = sorted(
-            [x for x in model_endpoints if x in endpoint_arn_to_name]
-        )
-
-        return model_endpoints_sorted
+        return sorted([x for x in model_endpoints if x in endpoint_arn_to_name])
 
     def get_group_wu(
         self, group_details: "DescribeModelPackageGroupOutputTypeDef"
@@ -320,7 +315,7 @@ class ModelProcessor:
 
         for model_data_url in model_data_urls:
 
-            data_url_matched_jobs = self.model_image_to_jobs.get(model_data_url, dict())
+            data_url_matched_jobs = self.model_image_to_jobs.get(model_data_url, {})
             # extend set of training jobs
             model_training_jobs = model_training_jobs.union(
                 {

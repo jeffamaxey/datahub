@@ -94,7 +94,7 @@ class DataProcessInstance:
         :param start_timestamp_millis:  (int) the execution start time in milliseconds
         :param attempt: (int) the number of attempt of the execution with the same execution id
         """
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="dataProcessInstance",
             entityUrn=str(self.urn),
             aspectName="dataProcessInstanceRunEvent",
@@ -105,7 +105,6 @@ class DataProcessInstance:
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
 
     def emit_process_start(
         self,
@@ -150,13 +149,13 @@ class DataProcessInstance:
                     raise Exception(
                         f"Invalid urn type {self.template_urn.__class__.__name__}"
                     )
-                for upstream in self.upstream_urns:
-                    input_datajob_urns.append(
-                        DataJobUrn.create_from_ids(
-                            job_id=upstream.get_dataprocessinstance_id(),
-                            data_flow_urn=str(job_flow_urn),
-                        )
+                input_datajob_urns.extend(
+                    DataJobUrn.create_from_ids(
+                        job_id=upstream.get_dataprocessinstance_id(),
+                        data_flow_urn=str(job_flow_urn),
                     )
+                    for upstream in self.upstream_urns
+                )
             else:
                 template_object = self._template_object
 
@@ -182,7 +181,7 @@ class DataProcessInstance:
         :param result_type: (string) It identifies the system where the native result comes from like Airflow, Azkaban
         :param attempt: (int) the attempt number of this execution
         """
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="dataProcessInstance",
             entityUrn=str(self.urn),
             aspectName="dataProcessInstanceRunEvent",
@@ -199,7 +198,6 @@ class DataProcessInstance:
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
 
     def emit_process_end(
         self,
@@ -233,7 +231,7 @@ class DataProcessInstance:
         Generates mcps from the object
         :rtype: Iterable[MetadataChangeProposalWrapper]
         """
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="dataProcessInstance",
             entityUrn=str(self.urn),
             aspectName="dataProcessInstanceProperties",
@@ -249,23 +247,21 @@ class DataProcessInstance:
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
-
-        mcp = MetadataChangeProposalWrapper(
+        yield MetadataChangeProposalWrapper(
             entityType="dataProcessInstance",
             entityUrn=str(self.urn),
             aspectName="dataProcessInstanceRelationships",
             aspect=DataProcessInstanceRelationships(
                 upstreamInstances=[str(urn) for urn in self.upstream_urns],
-                parentTemplate=str(self.template_urn) if self.template_urn else None,
+                parentTemplate=str(self.template_urn)
+                if self.template_urn
+                else None,
                 parentInstance=str(self.parent_instance)
                 if self.parent_instance is not None
                 else None,
             ),
             changeType=ChangeTypeClass.UPSERT,
         )
-        yield mcp
-
         yield from self.generate_inlet_outlet_mcp()
 
     @staticmethod
@@ -350,7 +346,7 @@ class DataProcessInstance:
 
     def generate_inlet_outlet_mcp(self) -> Iterable[MetadataChangeProposalWrapper]:
         if self.inlets:
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="dataProcessInstance",
                 entityUrn=str(self.urn),
                 aspectName="dataProcessInstanceInput",
@@ -359,10 +355,8 @@ class DataProcessInstance:
                 ),
                 changeType=ChangeTypeClass.UPSERT,
             )
-            yield mcp
-
         if self.outlets:
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="dataProcessInstance",
                 entityUrn=str(self.urn),
                 aspectName="dataProcessInstanceOutput",
@@ -371,16 +365,12 @@ class DataProcessInstance:
                 ),
                 changeType=ChangeTypeClass.UPSERT,
             )
-            yield mcp
-
         # Force entity materialization
         for iolet in self.inlets + self.outlets:
-            mcp = MetadataChangeProposalWrapper(
+            yield MetadataChangeProposalWrapper(
                 entityType="dataset",
                 entityUrn=str(iolet),
                 aspectName="status",
                 aspect=StatusClass(removed=False),
                 changeType=ChangeTypeClass.UPSERT,
             )
-
-            yield mcp

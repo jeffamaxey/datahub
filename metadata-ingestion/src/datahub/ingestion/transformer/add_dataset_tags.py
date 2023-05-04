@@ -42,8 +42,7 @@ class AddDatasetTags(DatasetTagsTransformer):
 
     def transform_one(self, mce: MetadataChangeEventClass) -> MetadataChangeEventClass:
         assert isinstance(mce.proposedSnapshot, DatasetSnapshotClass)
-        tags_to_add = self.config.get_tags_to_add(mce.proposedSnapshot)
-        if tags_to_add:
+        if tags_to_add := self.config.get_tags_to_add(mce.proposedSnapshot):
             tags = builder.get_or_add_aspect(
                 mce,
                 GlobalTagsClass(

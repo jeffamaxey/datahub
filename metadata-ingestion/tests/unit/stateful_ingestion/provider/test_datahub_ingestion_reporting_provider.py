@@ -105,11 +105,7 @@ class TestDatahubIngestionReportingProvider(unittest.TestCase):
                 "platformInstanceId": self.platform_instance_id,
             },
         )
-        # Retrieve the cached mcpw and return its aspect value.
-        mcpw = self.mcps_emitted.get(entity_urn)
-        if mcpw:
-            return mcpw.aspect
-        return None
+        return mcpw.aspect if (mcpw := self.mcps_emitted.get(entity_urn)) else None
 
     def test_provider(self):
 

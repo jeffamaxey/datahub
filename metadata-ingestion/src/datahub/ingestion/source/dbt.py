@@ -145,7 +145,7 @@ class DBTColumn:
     tags: List[str] = field(default_factory=list)
 
     def __repr__(self):
-        fields = tuple("{}={}".format(k, v) for k, v in self.__dict__.items())
+        fields = tuple(f"{k}={v}" for k, v in self.__dict__.items())
         return self.__class__.__name__ + str(tuple(sorted(fields))).replace("'", "")
 
 
@@ -177,7 +177,7 @@ class DBTNode:
     tags: List[str] = field(default_factory=list)
 
     def __repr__(self):
-        fields = tuple("{}={}".format(k, v) for k, v in self.__dict__.items())
+        fields = tuple(f"{k}={v}" for k, v in self.__dict__.items())
         return self.__class__.__name__ + str(tuple(sorted(fields))).replace("'", "")
 
 
@@ -323,9 +323,8 @@ def extract_dbt_entities(
 def load_file_as_json(uri: str) -> Any:
     if re.match("^https?://", uri):
         return json.loads(requests.get(uri).text)
-    else:
-        with open(uri, "r") as f:
-            return json.load(f)
+    with open(uri, "r") as f:
+        return json.load(f)
 
 
 def loadManifestAndCatalog(
@@ -395,10 +394,7 @@ def loadManifestAndCatalog(
 
 
 def get_db_fqn(database: Optional[str], schema: str, name: str) -> str:
-    if database is not None:
-        fqn = f"{database}.{schema}.{name}"
-    else:
-        fqn = f"{schema}.{name}"
+    fqn = f"{schema}.{name}" if database is None else f"{database}.{schema}.{name}"
     return fqn.replace('"', "")
 
 
@@ -794,11 +790,9 @@ class DBTSource(StatefulIngestionSourceBase):
             )
 
             if mce_platform == DBT_PLATFORM:
-                # add upstream lineage
-                upstream_lineage_class = self._create_lineage_aspect_for_dbt_node(
+                if upstream_lineage_class := self._create_lineage_aspect_for_dbt_node(
                     node, manifest_nodes_raw
-                )
-                if upstream_lineage_class:
+                ):
                     aspects.append(upstream_lineage_class)
 
                 # add view properties aspect
@@ -806,45 +800,40 @@ class DBTSource(StatefulIngestionSourceBase):
                     view_prop_aspect = self._create_view_properties_aspect(node)
                     aspects.append(view_prop_aspect)
 
-                # emit subtype mcp
-                sub_type_wu = self._create_subType_wu(node, node_datahub_urn)
-                if sub_type_wu:
+                if sub_type_wu := self._create_subType_wu(node, node_datahub_urn):
                     yield sub_type_wu
                     self.report.report_workunit(sub_type_wu)
 
-            else:
-                if not self.config.disable_dbt_node_creation:
-                    # if dbt node creation is enabled we are creating empty node for platform and only add
-                    # lineage/keyaspect.
-                    aspects = []
-                    if node.materialization == "ephemeral" or node.node_type == "test":
-                        continue
-
-                    # This code block is run when we are generating entities of platform type.
-                    # We will not link the platform not to the dbt node for type "source" because
-                    # in this case the platform table existed first.
-                    if node.node_type != "source":
-                        upstream_dbt_urn = get_urn_from_dbtNode(
-                            node.database,
-                            node.schema,
-                            node.name,
-                            DBT_PLATFORM,
-                            self.config.env,
-                        )
-                        upstreams_lineage_class = get_upstream_lineage(
-                            [upstream_dbt_urn]
-                        )
-                        aspects.append(upstreams_lineage_class)
-                else:
-                    # add upstream lineage
-                    platform_upstream_aspect = (
-                        self._create_lineage_aspect_for_platform_node(
-                            node, manifest_nodes_raw
-                        )
+            elif self.config.disable_dbt_node_creation:
+                if platform_upstream_aspect := (
+                    self._create_lineage_aspect_for_platform_node(
+                        node, manifest_nodes_raw
                     )
-                    if platform_upstream_aspect:
-                        aspects.append(platform_upstream_aspect)
+                ):
+                    aspects.append(platform_upstream_aspect)
 
+            else:
+                # if dbt node creation is enabled we are creating empty node for platform and only add
+                # lineage/keyaspect.
+                aspects = []
+                if node.materialization == "ephemeral" or node.node_type == "test":
+                    continue
+
+                # This code block is run when we are generating entities of platform type.
+                # We will not link the platform not to the dbt node for type "source" because
+                # in this case the platform table existed first.
+                if node.node_type != "source":
+                    upstream_dbt_urn = get_urn_from_dbtNode(
+                        node.database,
+                        node.schema,
+                        node.name,
+                        DBT_PLATFORM,
+                        self.config.env,
+                    )
+                    upstreams_lineage_class = get_upstream_lineage(
+                        [upstream_dbt_urn]
+                    )
+                    aspects.append(upstreams_lineage_class)
             if len(aspects) == 0:
                 continue
             dataset_snapshot = DatasetSnapshot(urn=node_datahub_urn, aspects=aspects)
@@ -867,10 +856,14 @@ class DBTSource(StatefulIngestionSourceBase):
     def get_aspect_from_dataset(
         self, dataset_snapshot: DatasetSnapshot, aspect_type: type
     ) -> Any:
-        for aspect in dataset_snapshot.aspects:
-            if isinstance(aspect, aspect_type):
-                return aspect
-        return None
+        return next(
+            (
+                aspect
+                for aspect in dataset_snapshot.aspects
+                if isinstance(aspect, aspect_type)
+            ),
+            None,
+        )
 
     # TODO: Remove. keeping this till PR review
     # def get_owners_from_dataset_snapshot(self, dataset_snapshot: DatasetSnapshot) -> Optional[OwnershipClass]:
@@ -892,10 +885,9 @@ class DBTSource(StatefulIngestionSourceBase):
     #     return None
 
     def get_patched_mce(self, mce):
-        owner_aspect = self.get_aspect_from_dataset(
+        if owner_aspect := self.get_aspect_from_dataset(
             mce.proposedSnapshot, OwnershipClass
-        )
-        if owner_aspect:
+        ):
             transformed_owner_list = self.get_transformed_owners_by_source_type(
                 owner_aspect.owners,
                 mce.proposedSnapshot.urn,
@@ -903,8 +895,9 @@ class DBTSource(StatefulIngestionSourceBase):
             )
             owner_aspect.owners = transformed_owner_list
 
-        tag_aspect = self.get_aspect_from_dataset(mce.proposedSnapshot, GlobalTagsClass)
-        if tag_aspect:
+        if tag_aspect := self.get_aspect_from_dataset(
+            mce.proposedSnapshot, GlobalTagsClass
+        ):
             transformed_tag_list = self.get_transformed_tags_by_prefix(
                 tag_aspect.tags,
                 mce.proposedSnapshot.urn,
@@ -912,10 +905,9 @@ class DBTSource(StatefulIngestionSourceBase):
             )
             tag_aspect.tags = transformed_tag_list
 
-        term_aspect: GlossaryTermsClass = self.get_aspect_from_dataset(
+        if term_aspect := self.get_aspect_from_dataset(
             mce.proposedSnapshot, GlossaryTermsClass
-        )
-        if term_aspect:
+        ):
             transformed_terms = self.get_transformed_terms(
                 term_aspect.terms, mce.proposedSnapshot.urn
             )
@@ -940,24 +932,22 @@ class DBTSource(StatefulIngestionSourceBase):
             **get_custom_properties(node),
             **additional_custom_props_filtered,
         }
-        dbt_properties = DatasetPropertiesClass(
+        return DatasetPropertiesClass(
             description=description,
             customProperties=custom_props,
             tags=node.tags,
             name=node.name,
         )
-        return dbt_properties
 
     def _create_view_properties_aspect(self, node: DBTNode) -> ViewPropertiesClass:
         materialized = node.materialization in {"table", "incremental"}
         # this function is only called when raw sql is present. assert is added to satisfy lint checks
         assert node.raw_sql is not None
-        view_properties = ViewPropertiesClass(
+        return ViewPropertiesClass(
             materialized=materialized,
             viewLanguage="SQL",
             viewLogic=node.raw_sql,
         )
-        return view_properties
 
     def _generate_base_aspects(
         self,
@@ -987,14 +977,12 @@ class DBTSource(StatefulIngestionSourceBase):
         # add owners aspect
         # we need to aggregate owners added by meta properties and the owners that are coming from server.
         meta_owner_aspects = meta_aspects.get(Constants.ADD_OWNER_OPERATION)
-        aggregated_owners = self._aggregate_owners(node, meta_owner_aspects)
-        if aggregated_owners:
+        if aggregated_owners := self._aggregate_owners(node, meta_owner_aspects):
             aspects.append(OwnershipClass(owners=aggregated_owners))
 
         # add tags aspects
         meta_tags_aspect = meta_aspects.get(Constants.ADD_TAG_OPERATION)
-        aggregated_tags = self._aggregate_tags(node, meta_tags_aspect)
-        if aggregated_tags:
+        if aggregated_tags := self._aggregate_tags(node, meta_tags_aspect):
             aspects.append(
                 mce_builder.make_global_tag_aspect_with_tag_list(aggregated_tags)
             )
@@ -1011,11 +999,12 @@ class DBTSource(StatefulIngestionSourceBase):
         # When generating these aspects for a dbt node, we will always include schema information. When generating
         # these aspects for a platform node (which only happens when disable_dbt_node_creation is set to true) we
         # honor the flag.
-        if mce_platform == DBT_PLATFORM:
+        if (
+            mce_platform != DBT_PLATFORM
+            and self.config.load_schemas
+            or mce_platform == DBT_PLATFORM
+        ):
             aspects.append(schema_metadata)
-        else:
-            if self.config.load_schemas:
-                aspects.append(schema_metadata)
         return aspects
 
     def _aggregate_owners(
@@ -1025,11 +1014,10 @@ class DBTSource(StatefulIngestionSourceBase):
         if node.owner:
             owner: str = node.owner
             if self.compiled_owner_extraction_pattern:
-                match: Optional[Any] = re.match(
+                if match := re.match(
                     self.compiled_owner_extraction_pattern, owner
-                )
-                if match:
-                    owner = match.group("owner")
+                ):
+                    owner = match["owner"]
                     logger.debug(
                         f"Owner after applying owner extraction pattern:'{self.config.owner_extraction_pattern}' is '{owner}'."
                     )
@@ -1047,13 +1035,12 @@ class DBTSource(StatefulIngestionSourceBase):
         if meta_owner_aspects and self.config.enable_meta_mapping:
             owner_list.extend(meta_owner_aspects.owners)
 
-        owner_list = sorted(owner_list, key=lambda x: x.owner)
-        return owner_list
+        return sorted(owner_list, key=lambda x: x.owner)
 
     def _aggregate_tags(self, node: DBTNode, meta_tag_aspect: Any) -> List[str]:
         tags_list: List[str] = []
         if node.tags:
-            tags_list = tags_list + node.tags
+            tags_list += node.tags
         if meta_tag_aspect and self.config.enable_meta_mapping:
             tags_list = tags_list + [
                 tag_association.tag[len("urn:li:tag:") :]
@@ -1081,11 +1068,10 @@ class DBTSource(StatefulIngestionSourceBase):
             aspectName="subTypes",
             aspect=SubTypesClass(typeNames=subtypes),
         )
-        subtype_wu = MetadataWorkUnit(
+        return MetadataWorkUnit(
             id=f"{self.platform}-{subtype_mcp.entityUrn}-{subtype_mcp.aspectName}",
             mcp=subtype_mcp,
         )
-        return subtype_wu
 
     def _create_lineage_aspect_for_dbt_node(
         self, node: DBTNode, manifest_nodes_raw: Dict[str, Dict[str, Any]]
@@ -1114,10 +1100,7 @@ class DBTSource(StatefulIngestionSourceBase):
                     self.config.env,
                 )
             )
-        if upstream_urns:
-            upstreams_lineage_class = get_upstream_lineage(upstream_urns)
-            return upstreams_lineage_class
-        return None
+        return get_upstream_lineage(upstream_urns) if upstream_urns else None
 
     def _create_lineage_aspect_for_platform_node(
         self, node: DBTNode, manifest_nodes_raw: Dict[str, Dict[str, Any]]
@@ -1125,15 +1108,14 @@ class DBTSource(StatefulIngestionSourceBase):
         """
         This methods created lineage amongst platform nodes. Called only when dbt creation is turned off.
         """
-        upstream_urns = get_upstreams(
+        if upstream_urns := get_upstreams(
             node.upstream_nodes,
             manifest_nodes_raw,
             self.config.use_identifiers,
             self.config.target_platform,
             self.config.env,
             self.config.disable_dbt_node_creation,
-        )
-        if upstream_urns:
+        ):
             return get_upstream_lineage(upstream_urns)
         return None
 
@@ -1151,12 +1133,14 @@ class DBTSource(StatefulIngestionSourceBase):
             if not existing_ownership or not existing_ownership.owners:
                 return transformed_owners
 
-            for existing_owner in existing_ownership.owners:
+            transformed_owners.extend(
+                existing_owner
+                for existing_owner in existing_ownership.owners
                 if (
                     existing_owner.source
                     and existing_owner.source.type != source_type_filter
-                ):
-                    transformed_owners.append(existing_owner)
+                )
+            )
         return sorted(transformed_owners, key=self.owner_sort_key)
 
     def owner_sort_key(self, owner_class: OwnerClass) -> str:
@@ -1178,7 +1162,7 @@ class DBTSource(StatefulIngestionSourceBase):
         entity_urn: str,
         tags_prefix_filter: str,
     ) -> List[TagAssociationClass]:
-        tag_set = set([new_tag.tag for new_tag in new_tags])
+        tag_set = {new_tag.tag for new_tag in new_tags}
 
         if self.ctx.graph:
             existing_tags_class = self.ctx.graph.get_tags(entity_urn)
@@ -1193,7 +1177,7 @@ class DBTSource(StatefulIngestionSourceBase):
     def get_transformed_terms(
         self, new_terms: List[GlossaryTermAssociation], entity_urn: str
     ) -> List[GlossaryTermAssociation]:
-        term_id_set = set([term.urn for term in new_terms])
+        term_id_set = {term.urn for term in new_terms}
         if self.ctx.graph:
             existing_terms_class = self.ctx.graph.get_glossary_terms(entity_urn)
             if existing_terms_class and existing_terms_class.terms:
@@ -1237,15 +1221,14 @@ class DBTSource(StatefulIngestionSourceBase):
         return f"{self.platform}_{project_id}"
 
     def is_checkpointing_enabled(self, job_id: JobId) -> bool:
-        if (
-            job_id == self.get_default_ingestion_job_id()
-            and self.is_stateful_ingestion_configured()
-            and self.config.stateful_ingestion
-            and self.config.stateful_ingestion.remove_stale_metadata
-        ):
-            return True
-
-        return False
+        return bool(
+            (
+                job_id == self.get_default_ingestion_job_id()
+                and self.is_stateful_ingestion_configured()
+                and self.config.stateful_ingestion
+                and self.config.stateful_ingestion.remove_stale_metadata
+            )
+        )
 
     def get_default_ingestion_job_id(self) -> JobId:
         """

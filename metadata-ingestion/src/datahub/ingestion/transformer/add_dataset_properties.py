@@ -56,10 +56,11 @@ class AddDatasetProperties(DatasetPropertiesTransformer):
         if not isinstance(mce.proposedSnapshot, DatasetSnapshotClass):
             return mce
 
-        properties_to_add = self.config.add_properties_resolver_class(  # type: ignore
+        if properties_to_add := self.config.add_properties_resolver_class(  # type: ignore
             **self.resolver_args
-        ).get_properties_to_add(mce.proposedSnapshot)
-        if properties_to_add:
+        ).get_properties_to_add(
+            mce.proposedSnapshot
+        ):
             properties = builder.get_or_add_aspect(
                 mce, DatasetPropertiesClass(customProperties={})
             )

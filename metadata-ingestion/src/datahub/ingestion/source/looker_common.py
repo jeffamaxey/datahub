@@ -105,12 +105,8 @@ class LookerExploreNamingConfig(ConfigModel):
     def init_naming_pattern(cls, v):
         if isinstance(v, NamingPattern):
             return v
-        else:
-            assert isinstance(v, str), "pattern must be a string"
-            naming_pattern = NamingPattern(
-                allowed_vars=naming_pattern_variables, pattern=v
-            )
-            return naming_pattern
+        assert isinstance(v, str), "pattern must be a string"
+        return NamingPattern(allowed_vars=naming_pattern_variables, pattern=v)
 
     @validator("explore_naming_pattern", "explore_browse_pattern", always=True)
     def validate_naming_pattern(cls, v):
@@ -132,12 +128,8 @@ class LookerViewNamingConfig(ConfigModel):
     def init_naming_pattern(cls, v):
         if isinstance(v, NamingPattern):
             return v
-        else:
-            assert isinstance(v, str), "pattern must be a string"
-            naming_pattern = NamingPattern(
-                allowed_vars=naming_pattern_variables, pattern=v
-            )
-            return naming_pattern
+        assert isinstance(v, str), "pattern must be a string"
+        return NamingPattern(allowed_vars=naming_pattern_variables, pattern=v)
 
     @validator("view_naming_pattern", "view_browse_pattern", always=True)
     def validate_naming_pattern(cls, v):
@@ -295,8 +287,7 @@ class LookerUtil:
         assert (
             field.count(".") == 1
         ), f"Error: A field must be prefixed by a view name, field is: {field}"
-        view_name = field.split(".")[0]
-        return view_name
+        return field.split(".")[0]
 
     @staticmethod
     def _get_field_type(
@@ -317,8 +308,7 @@ class LookerUtil:
             )
             type_class = NullTypeClass
 
-        data_type = SchemaFieldDataType(type=type_class())
-        return data_type
+        return SchemaFieldDataType(type=type_class())
 
     @staticmethod
     def _get_schema(
@@ -327,12 +317,12 @@ class LookerUtil:
         view_fields: List[ViewField],
         reporter: SourceReport,
     ) -> Optional[SchemaMetadataClass]:
-        if view_fields == []:
+        if not view_fields:
             return None
         fields, primary_keys = LookerUtil._get_fields_and_primary_keys(
             view_fields=view_fields, reporter=reporter
         )
-        schema_metadata = SchemaMetadata(
+        return SchemaMetadata(
             schemaName=schema_name,
             platform=f"urn:li:dataPlatform:{platform_name}",
             version=0,
@@ -341,7 +331,6 @@ class LookerUtil:
             hash="",
             platformSchema=OtherSchema(rawSchema=""),
         )
-        return schema_metadata
 
     DIMENSION_TAG_URN = "urn:li:tag:Dimension"
     TEMPORAL_TAG_URN = "urn:li:tag:Temporal"
@@ -400,12 +389,11 @@ class LookerUtil:
                     for tag_name in LookerUtil.type_to_tag_map[field_type]
                 ]
             )
-        else:
-            reporter.report_warning(
-                "lookml",
-                f"Failed to map view field type {field_type}. Won't emit tags for it",
-            )
-            return None
+        reporter.report_warning(
+            "lookml",
+            f"Failed to map view field type {field_type}. Won't emit tags for it",
+        )
+        return None
 
     @staticmethod
     def get_tag_mces() -> Iterable[MetadataChangeEvent]:
@@ -429,12 +417,12 @@ class LookerUtil:
                 type=LookerUtil._get_field_type(field.type, reporter),
                 nativeDataType=field.type,
                 description=f"{field.description}"
-                if tag_measures_and_dimensions is True
+                if tag_measures_and_dimensions
                 else f"{field.field_type.value}. {field.description}",
                 globalTags=LookerUtil._get_tags_from_field_type(
                     field.field_type, reporter
                 )
-                if tag_measures_and_dimensions is True
+                if tag_measures_and_dimensions
                 else None,
                 isPartOfKey=field.is_primary_key,
             )
@@ -479,7 +467,7 @@ class LookerExplore:
                 if sql_on is not None:
                     fields = cls._get_fields_from_sql_equality(sql_on)
                     joins = fields
-                    for f in fields:
+                    for f in joins:
                         view_names.add(LookerUtil._extract_view_from_field(f))
         else:
             # non-join explore, get view_name from `from` field if possible, default to explore name
@@ -546,48 +534,43 @@ class LookerExplore:
             view_fields: List[ViewField] = []
             if explore.fields is not None:
                 if explore.fields.dimensions is not None:
-                    for dim_field in explore.fields.dimensions:
-                        if dim_field.name is None:
-                            continue
-                        else:
-                            view_fields.append(
-                                ViewField(
-                                    name=dim_field.name,
-                                    description=dim_field.description
-                                    if dim_field.description
-                                    else "",
-                                    type=dim_field.type
-                                    if dim_field.type is not None
-                                    else "",
-                                    field_type=ViewFieldType.DIMENSION_GROUP
-                                    if dim_field.dimension_group is not None
-                                    else ViewFieldType.DIMENSION,
-                                    is_primary_key=dim_field.primary_key
-                                    if dim_field.primary_key
-                                    else False,
-                                )
-                            )
+                    view_fields.extend(
+                        ViewField(
+                            name=dim_field.name,
+                            description=dim_field.description
+                            if dim_field.description
+                            else "",
+                            type=dim_field.type
+                            if dim_field.type is not None
+                            else "",
+                            field_type=ViewFieldType.DIMENSION_GROUP
+                            if dim_field.dimension_group is not None
+                            else ViewFieldType.DIMENSION,
+                            is_primary_key=dim_field.primary_key
+                            if dim_field.primary_key
+                            else False,
+                        )
+                        for dim_field in explore.fields.dimensions
+                        if dim_field.name is not None
+                    )
                 if explore.fields.measures is not None:
-                    for measure_field in explore.fields.measures:
-                        if measure_field.name is None:
-                            continue
-                        else:
-                            view_fields.append(
-                                ViewField(
-                                    name=measure_field.name,
-                                    description=measure_field.description
-                                    if measure_field.description
-                                    else "",
-                                    type=measure_field.type
-                                    if measure_field.type is not None
-                                    else "",
-                                    field_type=ViewFieldType.MEASURE,
-                                    is_primary_key=measure_field.primary_key
-                                    if measure_field.primary_key
-                                    else False,
-                                )
-                            )
-
+                    view_fields.extend(
+                        ViewField(
+                            name=measure_field.name,
+                            description=measure_field.description
+                            if measure_field.description
+                            else "",
+                            type=measure_field.type
+                            if measure_field.type is not None
+                            else "",
+                            field_type=ViewFieldType.MEASURE,
+                            is_primary_key=measure_field.primary_key
+                            if measure_field.primary_key
+                            else False,
+                        )
+                        for measure_field in explore.fields.measures
+                        if measure_field.name is not None
+                    )
             return cls(
                 name=explore_name,
                 model_name=model,
@@ -599,15 +582,9 @@ class LookerExplore:
                 source_file=explore.source_file,
             )
         except SDKError as e:
-            logger.warn(
-                "Failed to extract explore {} from model {}.".format(
-                    explore_name, model
-                )
-            )
+            logger.warn(f"Failed to extract explore {explore_name} from model {model}.")
             logger.debug(
-                "Failed to extract explore {} from model {} with {}".format(
-                    explore_name, model, e
-                )
+                f"Failed to extract explore {explore_name} from model {model} with {e}"
             )
         except AssertionError:
             reporter.report_warning(
@@ -659,7 +636,7 @@ class LookerExplore:
         # If the base_url contains a port number (like https://company.looker.com:19999) remove the port number
         m = re.match("^(.*):([0-9]+)$", base_url)
         if m is not None:
-            base_url = m.group(1)
+            base_url = m[1]
         return f"{base_url}/explore/{self.model_name}/{self.name}"
 
     def _to_metadata_events(  # noqa: C901

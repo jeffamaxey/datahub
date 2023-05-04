@@ -27,9 +27,9 @@ def get_lineage_config() -> DatahubLineageConfig:
     kwargs_str = conf.get("lineage", "datahub_kwargs", fallback="{}")
     kwargs = json.loads(kwargs_str)
 
-    # Continue to support top-level datahub_conn_id config.
-    datahub_conn_id = conf.get("lineage", "datahub_conn_id", fallback=None)
-    if datahub_conn_id:
+    if datahub_conn_id := conf.get(
+        "lineage", "datahub_conn_id", fallback=None
+    ):
         kwargs["datahub_conn_id"] = datahub_conn_id
 
     return DatahubLineageConfig.parse_obj(kwargs)

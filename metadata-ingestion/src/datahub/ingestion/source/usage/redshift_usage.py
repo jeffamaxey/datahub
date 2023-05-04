@@ -215,13 +215,11 @@ class RedshiftUsageSource(Source):
         return create_engine(url, **self.config.options)
 
     def _should_process_row(self, row: RowProxy) -> bool:
-        # Check for mandatory proerties being present first.
-        missing_props: List[str] = [
+        if missing_props := [
             prop
             for prop in ["database", "schema", "table", "username"]
             if not row[prop]
-        ]
-        if missing_props:
+        ]:
             logging.info(
                 f"Access event parameter(s):[{','.join(missing_props)}] missing. Skipping ...."
             )

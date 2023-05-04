@@ -83,12 +83,11 @@ def make_dataplatform_instance_urn(platform: str, instance: str) -> str:
 def make_dataset_urn_with_platform_instance(
     platform: str, name: str, platform_instance: Optional[str], env: str = DEFAULT_ENV
 ) -> str:
-    if platform_instance:
-        if DATASET_URN_TO_LOWER:
-            name = name.lower()
-        return f"urn:li:dataset:({make_data_platform_urn(platform)},{platform_instance}.{name},{env})"
-    else:
+    if not platform_instance:
         return make_dataset_urn(platform=platform, name=name, env=env)
+    if DATASET_URN_TO_LOWER:
+        name = name.lower()
+    return f"urn:li:dataset:({make_data_platform_urn(platform)},{platform_instance}.{name},{env})"
 
 
 def make_schema_field_urn(parent_urn: str, field_path: str) -> str:
@@ -100,8 +99,8 @@ def schema_field_urn_to_key(schema_field_urn: str) -> Optional[SchemaFieldKeyCla
     pattern = r"urn:li:schemaField:\((.*),(.*)\)"
     results = re.search(pattern, schema_field_urn)
     if results is not None:
-        dataset_urn: str = results.group(1)
-        field_path: str = results.group(2)
+        dataset_urn: str = results[1]
+        field_path: str = results[2]
         return SchemaFieldKeyClass(parent=dataset_urn, fieldPath=field_path)
     return None
 
@@ -110,9 +109,7 @@ def dataset_urn_to_key(dataset_urn: str) -> Optional[DatasetKeyClass]:
     pattern = r"urn:li:dataset:\(urn:li:dataPlatform:(.*),(.*),(.*)\)"
     results = re.search(pattern, dataset_urn)
     if results is not None:
-        return DatasetKeyClass(
-            platform=results.group(1), name=results.group(2), origin=results.group(3)
-        )
+        return DatasetKeyClass(platform=results[1], name=results[2], origin=results[3])
     return None
 
 
@@ -123,11 +120,7 @@ def make_container_new_urn(guid: str) -> str:
 def container_new_urn_to_key(dataset_urn: str) -> Optional[ContainerKeyClass]:
     pattern = r"urn:dh:container:0:\((.*)\)"
     results = re.search(pattern, dataset_urn)
-    if results is not None:
-        return ContainerKeyClass(
-            guid=results.group(1),
-        )
-    return None
+    return ContainerKeyClass(guid=results[1]) if results is not None else None
 
 
 # def make_container_urn(platform: str, name: str, env: str = DEFAULT_ENV) -> str:
@@ -141,19 +134,14 @@ def make_container_urn(guid: str) -> str:
 def container_urn_to_key(guid: str) -> Optional[ContainerKeyClass]:
     pattern = r"urn:li:container:(.*)"
     results = re.search(pattern, guid)
-    if results is not None:
-        return ContainerKeyClass(
-            guid=results.group(1),
-        )
-    return None
+    return ContainerKeyClass(guid=results[1]) if results is not None else None
 
 
 def datahub_guid(obj: dict) -> str:
     obj_str = json.dumps(
         pre_json_transform(obj), separators=(",", ":"), sort_keys=True
     ).encode("utf-8")
-    datahub_guid = md5(obj_str).hexdigest()
-    return datahub_guid
+    return md5(obj_str).hexdigest()
 
 
 def make_assertion_urn(assertion_id: str) -> str:
@@ -272,7 +260,7 @@ def make_lineage_mce(
     downstream_urn: str,
     lineage_type: str = DatasetLineageTypeClass.TRANSFORMED,
 ) -> MetadataChangeEventClass:
-    mce = MetadataChangeEventClass(
+    return MetadataChangeEventClass(
         proposedSnapshot=DatasetSnapshotClass(
             urn=downstream_urn,
             aspects=[
@@ -288,7 +276,6 @@ def make_lineage_mce(
             ],
         )
     )
-    return mce
 
 
 # This bound isn't tight, but it's better than nothing.
@@ -300,14 +287,11 @@ def can_add_aspect(mce: MetadataChangeEventClass, AspectType: Type[Aspect]) -> b
 
     constructor_annotations = get_type_hints(SnapshotType.__init__)
     aspect_list_union = typing_inspect.get_args(constructor_annotations["aspects"])[0]
-    if not isinstance(aspect_list_union, tuple):
-        supported_aspect_types = typing_inspect.get_args(aspect_list_union)
-    else:
-        # On Python 3.6, the union type is represented as a tuple, where
-        # the first item is typing.Union and the subsequent elements are
-        # the types within the union.
-        supported_aspect_types = aspect_list_union[1:]
-
+    supported_aspect_types = (
+        aspect_list_union[1:]
+        if isinstance(aspect_list_union, tuple)
+        else typing_inspect.get_args(aspect_list_union)
+    )
     return issubclass(AspectType, supported_aspect_types)
 
 
@@ -325,9 +309,7 @@ def get_aspect_if_available(
         raise ValueError(
             f"MCE contains multiple aspects of type {AspectType}: {aspects}"
         )
-    if aspects:
-        return aspects[0]
-    return None
+    return aspects[0] if aspects else None
 
 
 def remove_aspect_if_available(
@@ -386,14 +368,13 @@ def make_ownership_aspect_from_urn_list(
 def make_glossary_terms_aspect_from_urn_list(term_urns: List[str]) -> GlossaryTerms:
     for term_urn in term_urns:
         assert term_urn.startswith("urn:li:glossaryTerm:")
-    glossary_terms = GlossaryTerms(
+    return GlossaryTerms(
         [GlossaryTermAssociationClass(term_urn) for term_urn in term_urns],
         AuditStampClass(
             time=int(time.time() * 1000),
             actor="urn:li:corpuser:datahub",
         ),
     )
-    return glossary_terms
 
 
 def set_aspect(
